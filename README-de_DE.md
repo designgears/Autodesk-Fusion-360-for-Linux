@@ -310,7 +310,7 @@ Alternativ können Sie Autodesk Fusion 360 als Flatpak installieren und verwende
 
 Für den SSO-Login-Bug verwenden Sie bitte diesen Workaround: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/460#issuecomment-2315888332
 
-- Alternativ können Sie Fusion 360 über Distrobox auf einem Gnome Wayland-Desktop installieren: https://github.com/cryinkfly/Autodesk-Fusion-360-for-Linux/issues/557
+- Alternativ können Sie Fusion 360 über Distrobox auf einem Gnome Wayland-Desktop installieren: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/557
 - Jetzt können Sie Autodesk Fusion 360 auf Ihrem Linux-System verwenden!
 
 ### Welche Skriptversionen sind verfügbar?
