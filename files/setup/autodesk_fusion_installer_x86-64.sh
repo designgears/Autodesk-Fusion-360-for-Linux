@@ -310,11 +310,13 @@ check_option() {
         --uninstall)
             clear
             echo "$(gettext "${YELLOW}Starting the uninstallation process ...${NOCOLOR}")"
-            # Show a list of two options with:
-            # 1. Are you sure you want to uninstall Autodesk Fusion and all its components?
-            # 2. Uninstall only a specific Wineprefix of Autodesk Fusion
+            echo -e "$(gettext "${GREEN}Installation directory: ${YELLOW}$SELECTED_DIRECTORY${NOCOLOR}")"
 
-
+            # Check if the installation directory exists
+            if [ ! -d "$SELECTED_DIRECTORY" ]; then
+                echo -e "$(gettext "${RED}The installation directory $SELECTED_DIRECTORY does not exist! Nothing to uninstall.${NOCOLOR}")"
+                exit 1
+            fi
 
             read -p "$(gettext "${GREEN}Do you really want to uninstall Autodesk Fusion?${NOCOLOR}") [y/n] " yn
             case $yn in
@@ -323,26 +325,40 @@ check_option() {
                         read -p "$(gettext "${GREEN}Please select an option: ${NOCOLOR}")" uninstall_option
 
                         case $uninstall_option in
-                            1) echo "$(gettext "${RED}Uninstall Autodesk Fusion with all Wineprefixes and components${NOCOLOR}")"
+                            1) echo -e "$(gettext "${RED}Removing: $SELECTED_DIRECTORY${NOCOLOR}")"
                                rm -rf "$SELECTED_DIRECTORY";
-                               rm -rf "$HOME/.local/share/applications/wine/Programs/Autodesk/Autodesk Fusion.desktop";
+                               rm -f "$HOME/.local/share/applications/wine/Programs/Autodesk/Autodesk Fusion.desktop";
+                               rm -f "$HOME/.local/share/applications/wine/Programs/Autodesk/adskidmgr-opener.desktop";
                                echo "$(gettext "${GREEN}Autodesk Fusion has been uninstalled successfully!${NOCOLOR}")"
                                exit;;
-                            2) echo "$(gettext "${GREEN}Listing all Wineprefixes of Autodesk Fusion in the ${SELECTED_DIRECTORY}/wineprefixes/ directory${NOCOLOR}")"
+                            2) if [ ! -d "$SELECTED_DIRECTORY/wineprefixes/" ]; then
+                                   echo -e "$(gettext "${RED}No wineprefixes directory found in $SELECTED_DIRECTORY!${NOCOLOR}")"
+                                   exit 1
+                               fi
+                               echo "$(gettext "${GREEN}Listing all Wineprefixes of Autodesk Fusion in the ${SELECTED_DIRECTORY}/wineprefixes/ directory${NOCOLOR}")"
                                # Initialize counter
                                COUNTER=1
                                for wp in "$SELECTED_DIRECTORY/wineprefixes/"*; do
+                                  [ -d "$wp" ] || continue
                                   # Display the counter and wineprefix name
                                   echo "$(gettext "${YELLOW}${COUNTER}. $(basename "$wp")${NOCOLOR}")"
                                   # Increment the counter
                                   COUNTER=$((COUNTER + 1))
                                done
+                               if [ "$COUNTER" -eq 1 ]; then
+                                   echo -e "$(gettext "${RED}No wineprefixes found!${NOCOLOR}")"
+                                   exit 1
+                               fi
                                read -p "$(gettext "${RED}Enter the number of the Wineprefix you want to uninstall or type 'exit' to cancel the process: ${NOCOLOR}")" DEL_SELECTED_WINEPREFIX
                                case $DEL_SELECTED_WINEPREFIX in
                                    exit) echo "$(gettext "${GREEN}The uninstallation process has been canceled!${NOCOLOR}")"
                                          exit;;
                                    *) DEL_SELECTED_WINEPREFIX=$(ls "$SELECTED_DIRECTORY/wineprefixes/" | sed -n "${DEL_SELECTED_WINEPREFIX}p")
-                                      echo "$(gettext "${YELLOW}Uninstalling the selected Wineprefix ...${NOCOLOR}")"
+                                      if [ -z "$DEL_SELECTED_WINEPREFIX" ]; then
+                                          echo -e "$(gettext "${RED}Invalid selection!${NOCOLOR}")"
+                                          exit 1
+                                      fi
+                                      echo -e "$(gettext "${YELLOW}Removing Wineprefix: $SELECTED_DIRECTORY/wineprefixes/$DEL_SELECTED_WINEPREFIX${NOCOLOR}")"
                                       rm -rf "$SELECTED_DIRECTORY/wineprefixes/$DEL_SELECTED_WINEPREFIX";
                                       echo "$(gettext "${GREEN}The selected Wineprefix has been uninstalled successfully!${NOCOLOR}")"
                                       exit;;
