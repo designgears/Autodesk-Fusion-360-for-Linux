@@ -26,11 +26,11 @@ SELECTED_OPTION="$1"
 SELECTED_DIRECTORY="$2"
 SELECTED_EXTENSIONS="$3"
 DOWNLOAD_EXTENSIONS=0
+PROTON_VERSION=""
 
 if [ -z "$SELECTED_DIRECTORY" ] || [ "$SELECTED_DIRECTORY" == "--default" ]; then
     SELECTED_DIRECTORY="$HOME/.autodesk_fusion"
 fi
-WINE_PFX="$SELECTED_DIRECTORY/wineprefixes/default"
 
 # if selected_extensions is set to --full, then all extensions will be installed
 if [ "$SELECTED_EXTENSIONS" == "--full" ]; then
@@ -38,7 +38,7 @@ if [ "$SELECTED_EXTENSIONS" == "--full" ]; then
     DOWNLOAD_EXTENSIONS=1
 fi
 
-REPO_URL="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main"
+REPO_URL="https://raw.githubusercontent.com/Lolig4/Autodesk-Fusion-360-for-Linux/main"
 
 # URL to download translations po. files <-- Still in progress!!!
 UPDATER_TRANSLATIONS_URL="$REPO_URL/files/setup/locale/update-locale.sh"
@@ -307,7 +307,7 @@ download_translations() {
 
 check_option() {
     case "$1" in
-        "--uninstall")
+        --uninstall)
             clear
             echo "$(gettext "${YELLOW}Starting the uninstallation process ...${NOCOLOR}")"
             # Show a list of two options with:
@@ -356,13 +356,25 @@ check_option() {
                     exit;;
             esac
             ;;
-        "--install")
+        --install|--proton=*)
             echo -e "$(gettext "${GREEN}Starting the installation process ...${NOCOLOR}")"
             sleep 2
             echo -e "$(gettext "${GREEN}Linux distribution: ${YELLOW}$DISTRO_VERSION${NOCOLOR}")"
             sleep 2
+            if [[ "$1" == --proton=* ]]; then
+                PROTON_VERSION="${1#--proton=}"
+                SELECTED_OPTION="--proton"
+            fi
             echo -e "$(gettext "${GREEN}Selected option: ${YELLOW}$SELECTED_OPTION${NOCOLOR}")"
             sleep 2
+            if [ -n "$PROTON_VERSION" ]; then
+                echo -e "$(gettext "${GREEN}Selected Proton version: ${YELLOW}$PROTON_VERSION${NOCOLOR}")"
+                PROTONPREFIX_DIRECTORY="$SELECTED_DIRECTORY/protonprefix"
+                WINE_PFX="$PROTONPREFIX_DIRECTORY/pfx"
+                sleep 2
+            else
+                WINE_PFX="$SELECTED_DIRECTORY/wineprefixes/default"
+            fi
             echo -e "$(gettext "${GREEN}Selected directory: ${YELLOW}$SELECTED_DIRECTORY${NOCOLOR}")"
             sleep 2
             echo -e "$(gettext "${GREEN}Selected extensions: ${YELLOW}$SELECTED_EXTENSIONS${NOCOLOR}")"
@@ -374,6 +386,9 @@ check_option() {
             check_gpu_driver
             check_gpu_vram
             check_disk_space
+            if [ -n "$PROTON_VERSION" ]; then
+                check_steam_proton
+            fi
             download_files
             check_and_install_wine
             wine_autodesk_fusion_install
@@ -387,7 +402,7 @@ check_option() {
             run_wine_autodesk_fusion
             exit;;
         *)
-            echo -e "$(gettext "${RED}Invalid option! Please use the --install or --uninstall flag!")${NOCOLOR}";
+            echo -e "$(gettext "${RED}Invalid option! Please use the --install, --proton, --proton=<version> or --uninstall flag!")${NOCOLOR}";
             exit;;
     esac
 }
@@ -639,6 +654,24 @@ check_disk_space() {
     fi
 }
 
+function check_steam_proton() {
+    # Check if Proton is installed and use Proton to run Autodesk Fusion 360
+    STEAM_DIRECTORY="$HOME/.local/share/Steam"
+    PROTON_DIRECTORY="$STEAM_DIRECTORY/compatibilitytools.d/$PROTON_VERSION"
+    if [ -d "$STEAM_DIRECTORY" ]; then
+        echo -e "$(gettext "${GREEN}Steam is installed!${NOCOLOR}")"
+        if [ -d "$PROTON_DIRECTORY" ]; then
+            echo -e "$(gettext "${GREEN}$PROTON_VERSION is installed!${NOCOLOR}")"
+        else
+            echo -e "$(gettext "${RED}$PROTON_VERSION is not installed!${NOCOLOR}")"
+            exit 1
+        fi
+    else
+        echo -e "$(gettext "${RED}Steam is not installed in $STEAM_DIRECTORY${NOCOLOR}")"
+        exit 1
+    fi
+}
+
 ##############################################################################################################################################################################
 # CHECK FIREFOX VERSION FOR THE INSTALLER:                                                                                                                                   #
 ##############################################################################################################################################################################
@@ -747,10 +780,14 @@ download_files() {
     download_file "autodesk_fusion.svg" "$REPO_URL/files/setup/resource/graphics/autodesk_fusion.svg" "$SELECTED_DIRECTORY/resources/graphics"
     download_file "Autodesk Fusion.desktop" "$REPO_URL/files/setup/resource/.desktop/Autodesk%20Fusion.desktop" "$SELECTED_DIRECTORY/.desktop"
     download_file "adskidmgr-opener.desktop" "$REPO_URL/files/setup/resource/.desktop/adskidmgr-opener.desktop" "$SELECTED_DIRECTORY/.desktop"
+    download_file "swap_desktop_files.sh" "$REPO_URL/files/setup/data/swap_desktop_files.sh" "$SELECTED_DIRECTORY/bin"
+    chmod +x "$SELECTED_DIRECTORY/bin/swap_desktop_files.sh"
 
     # Download some script files for Autodesk Fusion 360!
     download_file "autodesk_fusion_launcher.sh" "$REPO_URL/files/setup/data/autodesk_fusion_launcher.sh" "$SELECTED_DIRECTORY/bin"
     chmod +x "$SELECTED_DIRECTORY/bin/autodesk_fusion_launcher.sh"
+    download_file "fix-flicker.sh" "$REPO_URL/files/setup/data/fix-flicker.sh" "$SELECTED_DIRECTORY/bin"
+    chmod +x "$SELECTED_DIRECTORY/bin/fix-flicker.sh"
 }
 
 download_extensions_files() {
@@ -942,7 +979,7 @@ check_and_install_wine() {
                 1)
                     echo -e "$(gettext "${GREEN}WineHQ Repository selected. The WineHQ Repository will be used for the installation.${NOCOLOR}")"
                     pkexec bash -c '
-                        dnf config-manager --add-repo https://dl.winehq.org/wine-builds/fedora/43/winehq.repo
+                        dnf config-manager addrepo --from-repofile=https://dl.winehq.org/wine-builds/fedora/43/winehq.repo
                         dnf remove -y wine wine-*
                         dnf install -y winehq-staging'
                     ;;
@@ -950,14 +987,14 @@ check_and_install_wine() {
                     echo -e "$(gettext "${GREEN}openSUSE-Wine-OBS Repository selected. The openSUSE-Wine-OBS Repository will be used for the installation.${NOCOLOR}")"
                     pkexec bash -c '
                         rpm --import https://download.opensuse.org/repositories/Emulators:/Wine:/Fedora/Fedora_43/repodata/repomd.xml.key
-                        dnf config-manager --add-repo https://download.opensuse.org/repositories/Emulators:/Wine:/Fedora/Fedora_43/
+                        dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/Emulators:/Wine:/Fedora/Fedora_43/Emulators:Wine:Fedora.repo
                         dnf remove -y wine wine-*
                         dnf install -y winehq-staging'
                     ;;
                 *)
                     echo -e "$(gettext "${RED}Invalid choice. The WineHQ Repository will be used for the installation.${NOCOLOR}")"
                     pkexec bash -c '
-                        dnf config-manager --add-repo https://dl.winehq.org/wine-builds/fedora/43/winehq.repo
+                        dnf config-manager addrepo --from-repofile=https://dl.winehq.org/wine-builds/fedora/43/winehq.repo
                         dnf remove -y wine wine-*
                         dnf install -y winehq-staging'
                     ;;
@@ -965,7 +1002,7 @@ check_and_install_wine() {
         elif [[ $DISTRO_VERSION == *"Fedora"*"Rawhide"* ]]; then
             echo "Installing Wine for Fedora rawhide ..."
             pkexec bash -c '
-                dnf config-manager --add-repo https://download.opensuse.org/repositories/Emulators:/Wine:/Fedora/Fedora_Rawhide/
+                dnf config-manager addrepo --from-repofile=https://download.opensuse.org/repositories/Emulators:/Wine:/Fedora/Fedora_Rawhide/Emulators:Wine:Fedora.repo
                 dnf remove wine wine-*
                 dnf install -y winehq-staging'
         elif [[ $DISTRO_VERSION == *"Gentoo"* ]]; then
@@ -1071,7 +1108,9 @@ autodesk_fusion_shortcuts_load() {
     # Create a .desktop file (launcher.sh) for Autodesk Fusion!
     DESKTOP_DIRECTORY="$HOME/.local/share/applications/wine/Programs/Autodesk"
     mkdir -p "$DESKTOP_DIRECTORY"
-    rm -f "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
+    if [ -f "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop" ]; then
+        mv "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop" "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop.bak"
+    fi
     cp "$SELECTED_DIRECTORY/.desktop/Autodesk Fusion.desktop" "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
     echo "Exec=$SELECTED_DIRECTORY/bin/autodesk_fusion_launcher.sh" >> "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
     echo "Icon=$SELECTED_DIRECTORY/resources/graphics/autodesk_fusion.svg" >> "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
@@ -1085,9 +1124,15 @@ autodesk_fusion_shortcuts_load() {
     determine_variable_folder_name_for_identity_manager
 
     #Create mimetype link to handle web login call backs to the Identity Manager
-    rm -f "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
+    if [ -f "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop" ]; then
+        mv "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop" "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop.bak"
+    fi
     cp "$SELECTED_DIRECTORY/.desktop/adskidmgr-opener.desktop" "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
-    echo "Exec=sh -c 'env WINEPREFIX=$WINE_PFX wine \"\$(find $WINE_PFX -name AdskIdentityManager.exe | head -1)\" \"%u\"'" >> "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
+    if [ -n "$PROTON_VERSION" ]; then
+        echo "Exec=sh -c 'env STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run \"\$(find $WINE_PFX -name AdskIdentityManager.exe | head -1)\" \"%u\"'" >> "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
+    else
+        echo "Exec=sh -c 'env WINEPREFIX=$WINE_PFX wine \"\$(find $WINE_PFX -name AdskIdentityManager.exe | head -1)\" \"%u\"'" >> "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
+    fi
 
     #Set the permissions for the .desktop file to read-only
     chmod 444 "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
@@ -1172,8 +1217,29 @@ wine_autodesk_fusion_install() {
     # It protects against errors rather than malice. It's useful for, e.g., keeping games from saving their settings in random subdirectories of your home directory.
     # But it still ensures that wine, for example, no longer has access permissions to Home!
     # For this reason, the EXE files must be located directly in the Wineprefix folder!
-
+    if [ -n "$PROTON_VERSION" ]; then
+        echo -e "$(gettext "${YELLOW}Init Proton...${NOCOLOR}")"
+        if ! pgrep -x steam >/dev/null 2>&1; then
+            echo -e "$(gettext "${YELLOW}Starting Steam (background, no window)...${NOCOLOR}")"
+            # Start Steam in a separate user scope to avoid a parent-child link.
+            if command -v systemd-run >/dev/null 2>&1; then
+                setsid -f systemd-run --user --scope --quiet steam -silent </dev/null >/dev/null 2>&1
+            else
+                # Fallback if systemd-run is not available; Steam is linked to Fusion, so it can look like Fusion never exited.
+                setsid -f steam -silent </dev/null >/dev/null 2>&1
+            fi
+            sleep 5
+        fi
+        USER="steamuser"
+        STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run -- wineboot -u
+    fi
     echo -e "$(gettext "${YELLOW}Setting up the Wine prefix for Autodesk Fusion 360 in Sandbox... (suppressed)${NOCOLOR}")"
+    WINEPREFIX="$WINE_PFX" wineboot -u
+    DRIVE_PATH="$WINE_PFX/dosdevices/g:"
+    if [ ! -L "$DRIVE_PATH" ]; then
+        mkdir -p "$WINE_PFX/dosdevices"
+        ln -s "/" "$DRIVE_PATH"
+    fi
     WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q sandbox >> "$SELECTED_DIRECTORY/logs/winetricks_sandbox.log" 2>&1
 
     echo -e "$(gettext "${YELLOW}Linking the downloads folder to the Wine prefix...${NOCOLOR}")"
@@ -1187,7 +1253,7 @@ wine_autodesk_fusion_install() {
     WINEPREFIX="$WINE_PFX" wine control.exe appwiz.cpl install_gecko
     sleep 5
     # We must install some packages!
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q atmlib gdiplus arial corefonts cjkfonts dotnet452 msxml4 msxml6 vcrun2017 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet452.log"
+    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q atmlib gdiplus corefonts cjkfonts dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet452.log"
     # We must install cjkfonts again then sometimes it doesn't work in the first time!
     echo -e "$(gettext "${YELLOW}Re-installing cjkfonts... (suppressed)${NOCOLOR}")"
     sleep 5
@@ -1198,7 +1264,7 @@ wine_autodesk_fusion_install() {
     WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q win11 >> "$SELECTED_DIRECTORY/logs/winetricks_win11.log" 2>&1
     # Remove tracking metrics/calling home
     sleep 5
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d "" /f
+    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f
     # Navigation bar does not work well with anything other than the wine builtin DX9
     WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "AdCefWebBrowser.exe" /t REG_SZ /d builtin /f
     # Use Visual Studio Redist that is bundled with the application
@@ -1275,6 +1341,11 @@ autodesk_fusion_safe_logfile() {
     echo "$GPU_DRIVER" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
     echo "$SELECTED_DIRECTORY" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
     echo "$WINE_PFX" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
+    if [ -n "$PROTON_VERSION" ]; then
+        echo "$PROTON_VERSION" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
+    else
+        echo "Wine" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
+    fi
 }
 
 ##############################################################################################################################################################################
@@ -1304,5 +1375,5 @@ run_wine_autodesk_fusion() {
 ##############################################################################################################################################################################
 
 check_required_packages
-download_translations
+#download_translations
 check_option "$SELECTED_OPTION"
