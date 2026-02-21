@@ -335,7 +335,7 @@ curl -L https://codeberg.org/Lolig4/Autodesk-Fusion-360-on-Linux/raw/branch/main
 - For the SSO-Login bug use this Workaround: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/460#issuecomment-2315888332
 - If the Login is not working and you have used the installer script before, try removing the old identity manager desktop file:
   ```
-  rm ~/.local/share/applications/wine/Programs/Autodesk/adskidmgr-opener.desktop
+  rm ~/.local/share/applications/adskidmgr-opener.desktop
   ```
 
 - Or installing Fusion360 via Distrobox on a Gnome Wayland Desktop: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/557
