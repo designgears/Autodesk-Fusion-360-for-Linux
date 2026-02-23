@@ -866,7 +866,7 @@ check_and_install_wine() {
     fi
 
     # Check wine status 0 and install Wine version 
-    if [ "$WINE_STATUS" -eq 0 ]; then
+    if (( !WINE_STATUS )); then
         DISTRO_VERSION=$(lsb_release -ds) # Check which Linux Distro is used! <-- Still in progress!!!
         if [[ $DISTRO_VERSION == *"Arch"*"Linux"* ]] || [[ $DISTRO_VERSION == *"Manjaro"*"Linux"* ]] || [[ $DISTRO_VERSION == *"EndeavourOS"* ]] || [[ $DISTRO_VERSION == *"CachyOS"* ]]; then
             echo "Installing Wine for Arch Linux ..."
