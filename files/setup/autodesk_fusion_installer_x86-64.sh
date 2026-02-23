@@ -805,16 +805,16 @@ download_extensions_files() {
         "https://www.cadstudio.cz/dl/Ceska_lokalizace_pro_Autodesk_Fusion_360.exe" \
         "$EXTENSION_FILE_DIRECTORY"
     download_file "HP_3DPrinters_for_Fusion360-win64.msi" \
-        "https://github.com/cryinkfly/Autodesk-Fusion-360-for-Linux/raw/main/files/extensions/HP_3DPrinters_for_Fusion360-win64.msi" \
+        "$REPO_URL/files/extensions/HP_3DPrinters_for_Fusion360-win64.msi" \
         "$EXTENSION_FILE_DIRECTORY"
     download_file "Markforged_for_Fusion360-win64.msi" \
-        "https://github.com/cryinkfly/Autodesk-Fusion-360-for-Linux/raw/main/files/extensions/Markforged_for_Fusion360-win64.msi" \
+        "$REPO_URL/files/extensions/Markforged_for_Fusion360-win64.msi" \
         "$EXTENSION_FILE_DIRECTORY"
     download_file "OctoPrint_for_Fusion360-win64.msi" \
-        "https://github.com/cryinkfly/Autodesk-Fusion-360-for-Linux/raw/main/files/extensions/OctoPrint_for_Fusion360-win64.msi" \
+        "$REPO_URL/files/extensions/OctoPrint_for_Fusion360-win64.msi" \
         "$EXTENSION_FILE_DIRECTORY"
     download_file "Ultimaker_Digital_Factory-win64.msi" \
-        "https://github.com/cryinkfly/Autodesk-Fusion-360-for-Linux/raw/main/files/extensions/Ultimaker_Digital_Factory-win64.msi" \
+        "$REPO_URL/files/extensions/Ultimaker_Digital_Factory-win64.msi" \
         "$EXTENSION_FILE_DIRECTORY"
     echo -e "$(gettext "${GREEN}All tested extensions for Autodesk Fusion on Linux are downloaded!${NOCOLOR}")"
 }
