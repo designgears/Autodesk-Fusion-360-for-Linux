@@ -6,9 +6,9 @@
 # Author:       Steve Zabka                                                 #
 # Author URI:   https://cryinkfly.com                                       #
 # License:      MIT                                                         #
-# Copyright (c) 2020-2024                                                   #
-# Time/Date:    22:00/05.08.2024                                            #
-# Version:      2.0.0-Alpha                                                 #
+# Copyright (c) 2020-2026                                                   #
+# Time/Date:    08:39/23.02.2026                                            #
+# Version:      2.1.0-Alpha                                                 #
 #############################################################################
 
 # Path: SELECTED__INSTALLATION_PATH/bin/autodesk_fusion_launcher.sh

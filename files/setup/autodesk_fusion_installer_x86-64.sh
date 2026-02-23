@@ -7,8 +7,8 @@
 # Author URI:   https://cryinkfly.com                                                              #
 # License:      MIT                                                                                #
 # Copyright (c) 2020-2026                                                                          #
-# Time/Date:    11:57/21.02.2026                                                                   #
-# Version:      2.0.7-Alpha                                                                        #
+# Time/Date:    08:39/23.02.2026                                                                   #
+# Version:      2.1.0-Alpha                                                                        #
 ####################################################################################################
 
 ###############################################################################################################################################################
@@ -38,7 +38,7 @@ if [ "$SELECTED_EXTENSIONS" == "--full" ]; then
     DOWNLOAD_EXTENSIONS=1
 fi
 
-REPO_URL="https://codeberg.org/Lolig4/Autodesk-Fusion-360-on-Linux/raw/branch/main"
+REPO_URL="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main"
 
 # URL to download translations po. files <-- Still in progress!!!
 UPDATER_TRANSLATIONS_URL="$REPO_URL/files/setup/locale/update-locale.sh"
