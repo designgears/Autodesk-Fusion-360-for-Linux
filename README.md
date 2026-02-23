@@ -1,3 +1,8 @@
+>[!WARNING]
+>The transfer of all repositories to my [Codeberg account](https://codeberg.org/cryinkfly) is currently ongoing. In the future, this project will be continued on: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux!
+
+---
+
 # Autodesk Fusion 360 on Linux
 
 <img align="center" src="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-for-Linux/raw/branch/main/files/images/autodesk-fusion-linux-logo.png" width="250px" height="250px">
@@ -287,27 +292,51 @@ And would you like to use <a href="https://apps.autodesk.com/FUSION/de/Home/Inde
 - Check, if your system meets all requirements</a>!
 - You need an active Fusion 360 license</a>!
 
-Open a terminal and run this command to install the basic Autodesk Fusion:
+#### Open a terminal and run this command to install the basic Autodesk Fusion:
  
 ```
-curl -L https://raw.githubusercontent.com/cryinkfly/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default
 ```
 
-Open a terminal and run this command to install Autodesk Fusion with all tested extensions:
+#### Open a terminal and run this command to install Autodesk Fusion with all tested extensions:
 
 ```
-curl -L https://raw.githubusercontent.com/cryinkfly/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default --full
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default --full
 ```
 
-- Open a terminal and run this command to uninstall:
+#### Installation with Steam Proton (experimental)
+
+As an alternative to Wine, you can use [Steam Proton](https://github.com/ValveSoftware/Proton) to run Autodesk Fusion 360. This requires Steam to be installed and a compatible Proton version to be present in `~/.local/share/Steam/compatibilitytools.d/`. You can use [ProtonUp-Qt](https://davidotek.github.io/protonup-qt/) to easily install and manage Proton versions.
+
+Use the `--proton=<version>` flag to specify the Proton version, for example:
 
 ```
-curl -L https://raw.githubusercontent.com/cryinkfly/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --uninstall
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --proton=GE-Proton10-32 --default
 ```
 
-Or you install and use Autodesk Fusion 360 as a Flatpak app: https://usebottles.com/app/#fusion
+#### Open a terminal and run this command to uninstall:
 
-For the SSO-Login bug use this Workaround: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/460#issuecomment-2315888332
+```
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --uninstall
+```
+
+#### Or you install and use Autodesk Fusion 360 as a Flatpak app: https://usebottles.com/app/#fusion
+
+- If you have White flickering screen in Fusion
+
+   If Fusion is open, click into Fusion and press:
+   ```
+   Alt + Ctrl + N
+   ```
+   Or if Fusion is closed, run:
+   ```
+   ~/.autodesk_fusion/bin/fix-navbar-flicker.sh
+   ```
+- For the SSO-Login bug use this Workaround: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/460#issuecomment-2315888332
+- If the Login is not working and you have used the installer script before, try removing the old identity manager desktop file:
+  ```
+  rm ~/.local/share/applications/adskidmgr-opener.desktop
+  ```
 
 - Or installing Fusion360 via Distrobox on a Gnome Wayland Desktop: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/557
 - Now, You can <a href="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/44#issuecomment-890552181">use</a> Autodesk Fusion 360 on your Linux system!

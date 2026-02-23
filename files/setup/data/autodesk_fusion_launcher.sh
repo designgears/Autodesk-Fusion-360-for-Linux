@@ -6,9 +6,9 @@
 # Author:       Steve Zabka                                                 #
 # Author URI:   https://cryinkfly.com                                       #
 # License:      MIT                                                         #
-# Copyright (c) 2020-2024                                                   #
-# Time/Date:    22:00/05.08.2024                                            #
-# Version:      2.0.0-Alpha                                                 #
+# Copyright (c) 2020-2026                                                   #
+# Time/Date:    08:39/23.02.2026                                            #
+# Version:      2.1.0-Alpha                                                 #
 #############################################################################
 
 # Path: SELECTED__INSTALLATION_PATH/bin/autodesk_fusion_launcher.sh
@@ -22,24 +22,38 @@
 ###############################################################################################################################################################
 
 # Check in which directory the autodesk_fusion_launcher.sh file is located.
-WINEPREFIX_LOG_FILE=$HOME/.autodesk_fusion/logs/wineprefixes.log
-AUTODESK_ROOT_DIRECTORY=$(awk 'NR == 2' "$WINEPREFIX_LOG_FILE")
-WINEPREFIX_DIRECTORY=$(awk 'NR == 3' "$WINEPREFIX_LOG_FILE")
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Make AUTODESK_ROOT_DIRECTORY absolute (one level up from the script dir)
+AUTODESK_ROOT_DIRECTORY="$(cd "$SCRIPT_DIR/.." && pwd)"
+WINEPREFIX_LOG_FILE="$AUTODESK_ROOT_DIRECTORY/logs/wineprefixes.log"
+if [ ! -f "$WINEPREFIX_LOG_FILE" ]; then
+    echo "wineprefixes.log not found at $WINEPREFIX_LOG_FILE. Exiting..."
+    exit 1
+fi
+LOG_AUTODESK_ROOT_DIRECTORY=$(awk 'NR == 2' "$WINEPREFIX_LOG_FILE")
+if [ "$AUTODESK_ROOT_DIRECTORY" != "$LOG_AUTODESK_ROOT_DIRECTORY" ]; then
+    echo "Error: AUTODESK_ROOT_DIRECTORY does not match wineprefixes.log (line 2). Exiting..."
+    exit 1
+fi
+WINE_PFX=$(awk 'NR == 3' "$WINEPREFIX_LOG_FILE")
+PROTON_VERSION=$(awk 'NR == 4' "$WINEPREFIX_LOG_FILE")
+
+REPO_URL="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main"
 
 # This feature will check if there is a new version of Autodesk Fusion 360.
-function check_autodesk_fusion_online_versions {
-    curl -o $HOME/.autodesk_fusion/logs/version.txt -L https://raw.githubusercontent.com/cryinkfly/Autodesk-Fusion-360-for-Linux/main/files/builds/stable-branch/bin/build-version.txt
-    ONLINE_BUILD_VERSION=$(awk 'NR == 1' $AUTODESK_ROOT_DIRECTORY/logs/version.txt)
-    ONLINE_INSIDER_BUILD_VERSION=$(awk 'NR == 2' $AUTODESK_ROOT_DIRECTORY/logs/version.txt)
+function check_autodesk_fusion_online_versions() {
+    curl -o "$AUTODESK_ROOT_DIRECTORY/logs/version.txt" -L "$REPO_URL/files/builds/stable-branch/bin/build-version.txt"
+    ONLINE_BUILD_VERSION=$(awk 'NR == 1' "$AUTODESK_ROOT_DIRECTORY/logs/version.txt")
+    ONLINE_INSIDER_BUILD_VERSION=$(awk 'NR == 2' "$AUTODESK_ROOT_DIRECTORY/logs/version.txt")
     echo "Online Build-Version: $ONLINE_BUILD_VERSION"
     echo "Online Insider-Build-Version: $ONLINE_INSIDER_BUILD_VERSION"
     #check_versions #Update function not work correctly at the moment!!!
     run_autodesk_fusion
 }
 
-function check_version_file {
+function check_version_file() {
     # Find the newest version.txt file from the Autodesk Fusion 360 installation.
-    AUTODESK_FUSION_API_VERSION=$(find "$WINEPREFIX_DIRECTORY" -name fusion_version.txt -printf "%T+ %p\n" | sort -r 2>&1 | head -n 1 | sed -r 's/.+0000000000 (.+)/\1/')
+    AUTODESK_FUSION_API_VERSION=$(find "$WINE_PFX" -name fusion_version.txt -printf "%T+ %p\n" | sort -r 2>&1 | head -n 1 | sed -r 's/.+0000000000 (.+)/\1/')
     if [ -f "$AUTODESK_FUSION_API_VERSION" ]; then
         echo "The version.txt file exists!"
         check_versions
@@ -49,7 +63,7 @@ function check_version_file {
     fi
 }
 
-function check_versions {
+function check_versions() {
     # Get the string from the version.txt file from FUSION360_API_VERSION
     SYSTEM_BUILD_VERSION=$(cat "$AUTODESK_FUSION_API_VERSION")
     echo "System Build-Version: $SYSTEM_BUILD_VERSION"
@@ -62,14 +76,14 @@ function check_versions {
     fi
 }
 
-function backup_old_version {
+function backup_old_version() {
     # Backup the old version of the Autodesk Fusion 360
     echo "Backup the old version of the Autodesk Fusion 360!"
     # Copy $wineprefix to $wineprefix-backup-$SYSTEM_BUILD_VERSION
-    cp -r "$WINEPREFIX_DIRECTORY" "$WINEPREFIX_DIRECTORY-backup-$SYSTEM_BUILD_VERSION"
+    cp -r "$WINE_PFX" "$WINE_PFX-backup-$SYSTEM_BUILD_VERSION"
 }
 
-function update {
+function update() {
     echo "Update the Autodesk Fusion 360 version!"
     # Download the newest version of the Autodesk Fusion 360
     AUTODESK_FUSION_INSTALLER="$AUTODESK_ROOT_DIRECTORY/downloads/Fusion360ClientInstaller.exe"
@@ -77,16 +91,64 @@ function update {
     curl -L "$fusion360_installer_url" -o $AUTODESK_FUSION_INSTALLER
     cp "$AUTODESK_ROOT_DIRECTORY/downloads/Fusion360ClientInstaller.exe" "$SELECTED_DIRECTORY/wineprefixes/default/drive_c/users/$USER/Downloads"
     # Install the newest version of the Autodesk Fusion 360
-    WINEPREFIX="$WINEPREFIX_DIRECTORY" timeout -k 2m 1m wine "$WINEPREFIX_DIRECTORY/drive_c/users/$USER/Downloads/Fusion360installer.exe" --quiet
-    WINEPREFIX="$WINEPREFIX_DIRECTORY" timeout -k 2m 1m wine "$WINEPREFIX_DIRECTORY/drive_c/users/$USER/Downloads/Fusion360installer.exe" --quiet
+    WINEPREFIX="$WINE_PFX" timeout -k 2m 1m wine "$WINE_PFX/drive_c/users/$USER/Downloads/Fusion360installer.exe" --quiet
+    WINEPREFIX="$WINE_PFX" timeout -k 2m 1m wine "$WINE_PFX/drive_c/users/$USER/Downloads/Fusion360installer.exe" --quiet
     run_autodesk_fusion
 }
 
+function run_autodesk_fusion() {
+    if [ "$PROTON_VERSION" == "Wine" ]; then
+        run_autodesk_fusion_wine
+    else
+        run_autodesk_fusion_proton
+    fi
+}
 # You must change the first part ($HOME/.wineprefixes/fusion360) and the last part (WINEPREFIX="$HOME/.wineprefixes/fusion360") when you have installed Autodesk Fusion 360 into another directory!
-function run_autodesk_fusion {
-    LAUNCHER="$(find "$WINEPREFIX_DIRECTORY" -name Fusion360.exe -printf "%T+ %p\n" | sort -r 2>&1 | head -n 1 | sed -r 's/.+0000000000 (.+)/\1/')" && echo $LAUNCHER && WINEPREFIX="$WINEPREFIX_DIRECTORY" WINEDEBUG=-all WINEDEBUG=-d3d wine "$LAUNCHER"
+function run_autodesk_fusion_wine() {
+    LAUNCHER="$(find "$WINE_PFX" -name Fusion360.exe -printf "%T+ %p\n" | sort -r 2>&1 | head -n 1 | cut -d' ' -f2-)"
+
+    echo $LAUNCHER
+
+    WINEPREFIX="$WINE_PFX" \
+    WINEDEBUG=-all \
+    wine "$LAUNCHER" &
+
     # WINEDEBUG=-all = Logs everything, probably gives too much information in most cases, but may come in handy for subtle issues
     # WINEDEBUG=-d3d = Will turn off all d3d messages, and additionally disable checking for GL errors after operations. This may improve performance.
+
+    WINEPID=$!
+    wait "$WINEPID"
+
+    WINEPREFIX="$WINE_PFX" wineserver -k
+}
+
+function run_autodesk_fusion_proton() {
+    LAUNCHER="$(find "$WINE_PFX" -name Fusion360.exe -printf "%T+ %p\n" | sort -r 2>&1 | head -n 1 | cut -d' ' -f2-)"
+    #LAUNCHER_WIN=$(echo "$LAUNCHER" | sed "s|$PROTONPREFIX_DIRECTORY/pfx/drive_c|C:|" | sed 's|/|\\|g')
+    STEAM_DIRECTORY="$HOME/.local/share/Steam"
+    PROTON_DIRECTORY="$STEAM_DIRECTORY/compatibilitytools.d/$PROTON_VERSION"
+    
+    if ! pgrep -x steam >/dev/null 2>&1; then
+        echo -e "$(gettext "${YELLOW}Starting Steam (background, no window)...${NOCOLOR}")"
+        # Start Steam in a separate user scope to avoid a parent-child link.
+        if command -v systemd-run >/dev/null 2>&1; then
+            setsid -f systemd-run --user --scope --quiet steam -silent </dev/null >/dev/null 2>&1
+        else
+            # Fallback if systemd-run is not available; Steam is linked to Fusion, so it can look like Fusion never exited.
+            setsid -f steam -silent </dev/null >/dev/null 2>&1
+        fi
+        sleep 5
+    fi
+
+    PROTON_LOG=0 \
+    STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" \
+    STEAM_COMPAT_DATA_PATH="$AUTODESK_ROOT_DIRECTORY/protonprefix" \
+    "$PROTON_DIRECTORY/proton" run "$LAUNCHER" &
+
+    WINEPID=$!
+    wait $WINEPID
+
+    WINEPREFIX="$WINE_PFX" "$PROTON_DIRECTORY/files/bin/wineserver" -k
 }
 
 ###############################################################################################################################################################
