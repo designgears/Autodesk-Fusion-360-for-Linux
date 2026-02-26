@@ -319,7 +319,6 @@ delete_desktop_files() {
             rm -rf "$DIR"
             echo -e "$(gettext "${GREEN}Desktop files for the installation at $REMOVE_LOCATION have been deleted!${NOCOLOR}")"
             FOUND=1
-            break
         fi
     done
     if (( !FOUND )); then
