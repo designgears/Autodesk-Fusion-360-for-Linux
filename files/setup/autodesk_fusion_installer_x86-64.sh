@@ -410,7 +410,7 @@ check_option() {
             # Check if the installation directory exists
             if [ ! -d "$SELECTED_DIRECTORY" ]; then
                 echo -e "$(gettext "${RED}The installation directory $SELECTED_DIRECTORY does not exist!${NOCOLOR}")"
-                grep -v "^${SELECTED_DIRECTORY}$" "$INSTALLS_LOG" > "${INSTALLS_LOG}.tmp" && mv "${INSTALLS_LOG}.tmp" "$INSTALLS_LOG"
+                awk -v dir="$SELECTED_DIRECTORY" '($0 != dir)' "$INSTALLS_LOG" > "${INSTALLS_LOG}.tmp" && mv "${INSTALLS_LOG}.tmp" "$INSTALLS_LOG"
                 echo -e "$(gettext "${GREEN}Entry removed from installs.log!${NOCOLOR}")"
                 exit 1
             fi
@@ -426,7 +426,7 @@ check_option() {
                                 rm -rf "$SELECTED_DIRECTORY";
                                 delete_desktop_files "$SELECTED_DIRECTORY"
                                 # Remove the entry from installs.log
-                                grep -v "^${SELECTED_DIRECTORY}$" "$INSTALLS_LOG" > "${INSTALLS_LOG}.tmp" && mv "${INSTALLS_LOG}.tmp" "$INSTALLS_LOG"
+                                awk -v dir="$SELECTED_DIRECTORY" '($0 != dir)' "$INSTALLS_LOG" > "${INSTALLS_LOG}.tmp" && mv "${INSTALLS_LOG}.tmp" "$INSTALLS_LOG"
                                 echo "$(gettext "${GREEN}Autodesk Fusion has been uninstalled successfully!${NOCOLOR}")"
                                 exit;;
                             2)  if [ ! -d "$SELECTED_DIRECTORY/wineprefixes/" ]; then
