@@ -1204,6 +1204,13 @@ autodesk_fusion_shortcuts_load() {
             NAME="$(basename "$DIR")"
             if [[ "$NAME" =~ ^[0-9]+$ ]]; then
                 EXISTING_IDS["$NAME"]=1
+                    # Deactivate .desktop files in this directory
+                    if [ -f "$DIR/Autodesk Fusion.desktop" ]; then
+                        mv "$DIR/Autodesk Fusion.desktop" "$DIR/Autodesk Fusion.desktop.bak"
+                    fi
+                    if [ -f "$DIR/adskidmgr-opener.desktop" ]; then
+                        mv "$DIR/adskidmgr-opener.desktop" "$DIR/adskidmgr-opener.desktop.bak"
+                    fi
             fi
         done
         local NEW_ID=1
