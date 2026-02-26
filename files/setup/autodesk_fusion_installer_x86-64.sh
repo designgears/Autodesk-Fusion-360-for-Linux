@@ -1192,50 +1192,35 @@ check_and_install_wine() {
     fi
 }
 
-
-##############################################################################################################################################################################
-# HELPER FUNCTION FOR THE LOGIN CALLBACKS TO THE IDENTITY MANAGER:                                                                                                           #
-##############################################################################################################################################################################
-
-# Helper function for the following function. The AdskIdentityManager.exe can be installed 
-# into a variable alphanumeric folder.
-# This function finds that folder alphanumeric folder name.
-determine_variable_folder_name_for_identity_manager() {
-    echo "Searching for the variable location of the Autodesk Fusion identity manager..."
-    IDENT_MAN_PATH=$(find "$WINE_PFX" -name 'AdskIdentityManager.exe')
-    # Get the dirname of the identity manager's alphanumeric folder.
-    # With the full path of the identity manager, go 2 folders up and isolate the folder name.
-    IDENT_MAN_VARIABLE_DIRECTORY=$(basename "$(dirname "$(dirname "$IDENT_MAN_PATH")")")
-}
-
-########################################################################################
-
 # Load the icons and .desktop-files:
 autodesk_fusion_shortcuts_load() {
     if [ -d "$DESKTOP_DIRECTORY" ]; then
-        local MAX_ID=0
+        local -A EXISTING_IDS=()
         for DIR in "$DESKTOP_DIRECTORY/"*; do
             if [ ! -d "$DIR" ]; then
                 continue
             fi
             local NAME
             NAME="$(basename "$DIR")"
-            if [[ "$NAME" =~ ^[0-9]+$ ]] && (( NAME > MAX_ID )); then
-                MAX_ID="$NAME"
+            if [[ "$NAME" =~ ^[0-9]+$ ]]; then
+                EXISTING_IDS["$NAME"]=1
             fi
         done
-        local NEW_ID=$(( MAX_ID + 1 ))
+        local NEW_ID=1
+        while [[ -n "${EXISTING_IDS[$NEW_ID]+x}" ]]; do
+            (( NEW_ID++ ))
+        done
     else
         local NEW_ID=1
     fi
 
     local SCHORTCUT_DIRECTORY="$DESKTOP_DIRECTORY/$NEW_ID"
+    mkdir -p "$SCHORTCUT_DIRECTORY"
+
     echo "$SELECTED_DIRECTORY" >> "$SCHORTCUT_DIRECTORY/location.log"
     chmod 444 "$SCHORTCUT_DIRECTORY/location.log"
 
     # Create a .desktop file (launcher.sh) for Autodesk Fusion!
-    mkdir -p "$SCHORTCUT_DIRECTORY"
-
     cp "$SELECTED_DIRECTORY/.desktop/Autodesk Fusion.desktop" "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
     echo "Exec=$SELECTED_DIRECTORY/bin/autodesk_fusion_launcher.sh" >> "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
     echo "Icon=$SELECTED_DIRECTORY/resources/graphics/autodesk_fusion.svg" >> "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
@@ -1243,10 +1228,6 @@ autodesk_fusion_shortcuts_load() {
 
     # Set the permissions for the .desktop file to read-only
     chmod 444 "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
-
-
-    # Execute function
-    determine_variable_folder_name_for_identity_manager
 
     #Create mimetype link to handle web login call backs to the Identity Manager
     cp "$SELECTED_DIRECTORY/.desktop/adskidmgr-opener.desktop" "$SCHORTCUT_DIRECTORY/adskidmgr-opener.desktop"
