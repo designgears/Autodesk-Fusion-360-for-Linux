@@ -7,8 +7,8 @@
 # Author URI:   https://cryinkfly.com                                                              #
 # License:      MIT                                                                                #
 # Copyright (c) 2020-2026                                                                          #
-# Time/Date:    08:39/23.02.2026                                                                   #
-# Version:      2.1.0-Alpha                                                                        #
+# Time/Date:    09:17/26.02.2026                                                                   #
+# Version:      2.1.1-Alpha                                                                        #
 ####################################################################################################
 
 ###############################################################################################################################################################
@@ -27,8 +27,9 @@ SELECTED_DIRECTORY="$2"
 SELECTED_EXTENSIONS="$3"
 DOWNLOAD_EXTENSIONS=0
 PROTON_VERSION=""
+DESKTOP_DIRECTORY="$HOME/.local/share/applications/wine/Programs/Autodesk"
 
-if [ -z "$SELECTED_DIRECTORY" ] || [ "$SELECTED_DIRECTORY" == "--default" ]; then
+if [ "$SELECTED_DIRECTORY" == "--default" ]; then
     SELECTED_DIRECTORY="$HOME/.autodesk_fusion"
 fi
 
@@ -301,6 +302,31 @@ download_translations() {
     export TEXTDOMAINDIR
 }
 
+delete_desktop_files() {
+    local REMOVE_LOCATION="$1"
+    local FOUND=0
+    for DIR in "$DESKTOP_DIRECTORY/"*; do
+        if [ ! -d "$DIR" ]; then
+            continue
+        fi
+        LOCATION_FILE="$DIR/location.log"
+        if [ ! -f "$LOCATION_FILE" ] || [ ! -s "$LOCATION_FILE" ]; then
+            echo -e "$(gettext "${RED}location.log file not found or empty in $DIR! Skipping this directory.${NOCOLOR}")"
+            continue
+        fi
+        INSTALL_LOCATION=$(awk 'NR == 1' "$LOCATION_FILE")
+        if [ "$INSTALL_LOCATION" == "$REMOVE_LOCATION" ]; then
+            rm -rf "$DIR"
+            echo -e "$(gettext "${GREEN}Desktop files for the installation at $REMOVE_LOCATION have been deleted!${NOCOLOR}")"
+            FOUND=1
+        fi
+    done
+    if (( !FOUND )); then
+        echo -e "$(gettext "${RED}No desktop files found for the installation at $REMOVE_LOCATION${NOCOLOR}")"
+        exit 1
+    fi
+}
+
 ##############################################################################################################################################################################
 # CHECK THE OPTIONS FOR THE INSTALLER:                                                                                                                                       #
 ##############################################################################################################################################################################
@@ -310,61 +336,133 @@ check_option() {
         --uninstall)
             clear
             echo "$(gettext "${YELLOW}Starting the uninstallation process ...${NOCOLOR}")"
-            echo -e "$(gettext "${GREEN}Installation directory: ${YELLOW}$SELECTED_DIRECTORY${NOCOLOR}")"
 
-            # Check if the installation directory exists
-            if [ ! -d "$SELECTED_DIRECTORY" ]; then
-                echo -e "$(gettext "${RED}The installation directory $SELECTED_DIRECTORY does not exist! Nothing to uninstall.${NOCOLOR}")"
+            INSTALLS_LOG="$DESKTOP_DIRECTORY/installs.log"
+
+            if [ ! -f "$INSTALLS_LOG" ] || [ ! -s "$INSTALLS_LOG" ]; then
+                echo -e "$(gettext "${RED}No installations found! The file $INSTALLS_LOG does not exist or is empty.${NOCOLOR}")"
                 exit 1
             fi
 
-            read -p "$(gettext "${GREEN}Do you really want to uninstall Autodesk Fusion?${NOCOLOR}") [y/n] " yn
+            mapfile -t INSTALL_PATHS < <(grep -v '^$' "$INSTALLS_LOG" | sort -u)
+
+            if (( !${#INSTALL_PATHS[@]} )); then
+                echo -e "$(gettext "${RED}No installations found in $INSTALLS_LOG!${NOCOLOR}")"
+                exit 1
+            fi
+
+            # If a path was provided as argument, try to match it directly from installs.log
+            if [ -n "$SELECTED_DIRECTORY" ]; then
+                MATCH_FOUND=0
+                for install_path in "${INSTALL_PATHS[@]}"; do
+                    if [ "$install_path" == "$SELECTED_DIRECTORY" ]; then
+                        MATCH_FOUND=1
+                        break
+                    fi
+                done
+                if (( MATCH_FOUND )); then
+                    echo -e "$(gettext "${GREEN}Auto-selected installation: ${YELLOW}$SELECTED_DIRECTORY${NOCOLOR}")"
+                else
+                    echo -e "$(gettext "${RED}The provided path $SELECTED_DIRECTORY was not found in installs.log!${NOCOLOR}")"
+                    SELECTED_DIRECTORY=""
+                fi
+            fi
+
+            # If no valid path was auto-selected, show the interactive menu
+            if [ -z "$SELECTED_DIRECTORY" ]; then
+                # List all installations
+                echo -e "$(gettext "${GREEN}The following Autodesk Fusion installations were found:${NOCOLOR}")"
+                echo ""
+                TOTAL_INSTALLS=0
+                for install_path in "${INSTALL_PATHS[@]}"; do
+                    TOTAL_INSTALLS=$((TOTAL_INSTALLS + 1))
+                    if [ -d "$install_path" ]; then
+                        echo -e "  ${YELLOW}${TOTAL_INSTALLS}. ${install_path}${NOCOLOR}"
+                    else
+                        echo -e "  ${YELLOW}${TOTAL_INSTALLS}. ${install_path} ${RED}(directory not found)${NOCOLOR}"
+                    fi
+                done
+                echo ""
+
+                if [ "$TOTAL_INSTALLS" -eq 0 ]; then
+                    echo -e "$(gettext "${RED}No valid installations found in $INSTALLS_LOG!${NOCOLOR}")"
+                    exit 1
+                fi
+
+                echo -ne "$(gettext "Select an installation to uninstall [q to exit]: ")"
+                read -n 1 INSTALL_CHOICE
+                echo ""
+
+                if [ "$INSTALL_CHOICE" == "q" ] || [ "$INSTALL_CHOICE" == "Q" ]; then
+                    echo -e "$(gettext "${YELLOW}The uninstallation process has been canceled!${NOCOLOR}")"
+                    exit 0
+                fi
+
+                if ! [[ "$INSTALL_CHOICE" =~ ^[0-9]+$ ]] || [ "$INSTALL_CHOICE" -lt 1 ] || [ "$INSTALL_CHOICE" -gt "$TOTAL_INSTALLS" ]; then
+                    echo -e "$(gettext "${RED}Invalid selection!${NOCOLOR}")"
+                    exit 1
+                fi
+
+                SELECTED_DIRECTORY="${INSTALL_PATHS[$((INSTALL_CHOICE - 1))]}"
+                echo -e "$(gettext "${GREEN}Selected installation: ${YELLOW}$SELECTED_DIRECTORY${NOCOLOR}")"
+            fi
+
+            # Check if the installation directory exists
+            if [ ! -d "$SELECTED_DIRECTORY" ]; then
+                echo -e "$(gettext "${RED}The installation directory $SELECTED_DIRECTORY does not exist!${NOCOLOR}")"
+                awk -v dir="$SELECTED_DIRECTORY" '($0 != dir)' "$INSTALLS_LOG" > "${INSTALLS_LOG}.tmp" && mv "${INSTALLS_LOG}.tmp" "$INSTALLS_LOG"
+                echo -e "$(gettext "${GREEN}Entry removed from installs.log!${NOCOLOR}")"
+                exit 1
+            fi
+
+            read -p "$(gettext "${GREEN}Do you really want to uninstall Autodesk Fusion from $SELECTED_DIRECTORY?${NOCOLOR}") [y/n] " yn
             case $yn in
                 [Yy]* ) echo "$(gettext "${YELLOW}1. Uninstall Autodesk Fusion with all Wineprefixes and components${NOCOLOR}")"
                         echo "$(gettext "${YELLOW}2. Uninstall only a specific Wineprefix of Autodesk Fusion${NOCOLOR}")"
                         read -p "$(gettext "${GREEN}Please select an option: ${NOCOLOR}")" uninstall_option
 
                         case $uninstall_option in
-                            1) echo -e "$(gettext "${RED}Removing: $SELECTED_DIRECTORY${NOCOLOR}")"
-                               rm -rf "$SELECTED_DIRECTORY";
-                               rm -f "$HOME/.local/share/applications/wine/Programs/Autodesk/Autodesk Fusion.desktop";
-                               rm -f "$HOME/.local/share/applications/wine/Programs/Autodesk/adskidmgr-opener.desktop";
-                               echo "$(gettext "${GREEN}Autodesk Fusion has been uninstalled successfully!${NOCOLOR}")"
-                               exit;;
-                            2) if [ ! -d "$SELECTED_DIRECTORY/wineprefixes/" ]; then
-                                   echo -e "$(gettext "${RED}No wineprefixes directory found in $SELECTED_DIRECTORY!${NOCOLOR}")"
-                                   exit 1
-                               fi
-                               echo "$(gettext "${GREEN}Listing all Wineprefixes of Autodesk Fusion in the ${SELECTED_DIRECTORY}/wineprefixes/ directory${NOCOLOR}")"
-                               # Initialize counter
-                               COUNTER=1
-                               for wp in "$SELECTED_DIRECTORY/wineprefixes/"*; do
-                                  [ -d "$wp" ] || continue
-                                  # Display the counter and wineprefix name
-                                  echo "$(gettext "${YELLOW}${COUNTER}. $(basename "$wp")${NOCOLOR}")"
-                                  # Increment the counter
-                                  COUNTER=$((COUNTER + 1))
-                               done
-                               if [ "$COUNTER" -eq 1 ]; then
-                                   echo -e "$(gettext "${RED}No wineprefixes found!${NOCOLOR}")"
-                                   exit 1
-                               fi
-                               read -p "$(gettext "${RED}Enter the number of the Wineprefix you want to uninstall or type 'exit' to cancel the process: ${NOCOLOR}")" DEL_SELECTED_WINEPREFIX
-                               case $DEL_SELECTED_WINEPREFIX in
-                                   exit) echo "$(gettext "${GREEN}The uninstallation process has been canceled!${NOCOLOR}")"
-                                         exit;;
-                                   *) DEL_SELECTED_WINEPREFIX=$(ls "$SELECTED_DIRECTORY/wineprefixes/" | sed -n "${DEL_SELECTED_WINEPREFIX}p")
-                                      if [ -z "$DEL_SELECTED_WINEPREFIX" ]; then
-                                          echo -e "$(gettext "${RED}Invalid selection!${NOCOLOR}")"
-                                          exit 1
-                                      fi
-                                      echo -e "$(gettext "${YELLOW}Removing Wineprefix: $SELECTED_DIRECTORY/wineprefixes/$DEL_SELECTED_WINEPREFIX${NOCOLOR}")"
-                                      rm -rf "$SELECTED_DIRECTORY/wineprefixes/$DEL_SELECTED_WINEPREFIX";
-                                      echo "$(gettext "${GREEN}The selected Wineprefix has been uninstalled successfully!${NOCOLOR}")"
-                                      exit;;
-                               esac;;  
+                            1)  echo -e "$(gettext "${RED}Removing: $SELECTED_DIRECTORY${NOCOLOR}")"
+                                rm -rf "$SELECTED_DIRECTORY";
+                                delete_desktop_files "$SELECTED_DIRECTORY"
+                                # Remove the entry from installs.log
+                                awk -v dir="$SELECTED_DIRECTORY" '($0 != dir)' "$INSTALLS_LOG" > "${INSTALLS_LOG}.tmp" && mv "${INSTALLS_LOG}.tmp" "$INSTALLS_LOG"
+                                echo "$(gettext "${GREEN}Autodesk Fusion has been uninstalled successfully!${NOCOLOR}")"
+                                exit;;
+                            2)  if [ ! -d "$SELECTED_DIRECTORY/wineprefixes/" ]; then
+                                    echo -e "$(gettext "${RED}No wineprefixes directory found in $SELECTED_DIRECTORY!${NOCOLOR}")"
+                                    exit 1
+                                fi
+                                echo "$(gettext "${GREEN}Listing all Wineprefixes of Autodesk Fusion in the ${SELECTED_DIRECTORY}/wineprefixes/ directory${NOCOLOR}")"
+                                # Initialize counter
+                                COUNTER=1
+                                for wp in "$SELECTED_DIRECTORY/wineprefixes/"*; do
+                                    [ -d "$wp" ] || continue
+                                    # Display the counter and wineprefix name
+                                    echo "$(gettext "${YELLOW}${COUNTER}. $(basename "$wp")${NOCOLOR}")"
+                                    # Increment the counter
+                                    COUNTER=$((COUNTER + 1))
+                                done
+                                if [ "$COUNTER" -eq 1 ]; then
+                                    echo -e "$(gettext "${RED}No wineprefixes found!${NOCOLOR}")"
+                                    exit 1
+                                fi
+                                read -p "$(gettext "${RED}Enter the number of the Wineprefix you want to uninstall or type 'exit' to cancel the process: ${NOCOLOR}")" DEL_SELECTED_WINEPREFIX
+                                case $DEL_SELECTED_WINEPREFIX in
+                                    exit) echo "$(gettext "${GREEN}The uninstallation process has been canceled!${NOCOLOR}")"
+                                        exit;;
+                                    *) DEL_SELECTED_WINEPREFIX=$(ls "$SELECTED_DIRECTORY/wineprefixes/" | sed -n "${DEL_SELECTED_WINEPREFIX}p")
+                                        if [ -z "$DEL_SELECTED_WINEPREFIX" ]; then
+                                            echo -e "$(gettext "${RED}Invalid selection!${NOCOLOR}")"
+                                            exit 1
+                                        fi
+                                        echo -e "$(gettext "${YELLOW}Removing Wineprefix: $SELECTED_DIRECTORY/wineprefixes/$DEL_SELECTED_WINEPREFIX${NOCOLOR}")"
+                                        rm -rf "$SELECTED_DIRECTORY/wineprefixes/$DEL_SELECTED_WINEPREFIX";
+                                        echo "$(gettext "${GREEN}The selected Wineprefix has been uninstalled successfully!${NOCOLOR}")"
+                                        exit;;
+                                esac;;  
                             *) echo "$(gettext "${RED}Please select a valid option!${NOCOLOR}")"
-                               exit;;
+                                exit;;
                         esac;;  
                 [Nn]* ) echo -e "$(gettext "${GREEN}The uninstallation process has been canceled!")${NOCOLOR}"; 
                         exit;;
@@ -719,7 +817,7 @@ check_install_firefox_deb() {
             echo "Proceeding with the uninstallation of the Snap version and installation of the DEB version..."
 
             # Uninstall Firefox Snap
-            sudo snap remove -y firefox
+            sudo snap remove firefox
 
             # Create an APT keyring directory if it doesn't exist
             sudo install -d -m 0755 /etc/apt/keyrings
@@ -1093,63 +1191,66 @@ check_and_install_wine() {
     fi
 }
 
-
-##############################################################################################################################################################################
-# HELPER FUNCTION FOR THE LOGIN CALLBACKS TO THE IDENTITY MANAGER:                                                                                                           #
-##############################################################################################################################################################################
-
-# Helper function for the following function. The AdskIdentityManager.exe can be installed 
-# into a variable alphanumeric folder.
-# This function finds that folder alphanumeric folder name.
-determine_variable_folder_name_for_identity_manager() {
-    echo "Searching for the variable location of the Autodesk Fusion identity manager..."
-    IDENT_MAN_PATH=$(find "$WINE_PFX" -name 'AdskIdentityManager.exe')
-    # Get the dirname of the identity manager's alphanumeric folder.
-    # With the full path of the identity manager, go 2 folders up and isolate the folder name.
-    IDENT_MAN_VARIABLE_DIRECTORY=$(basename "$(dirname "$(dirname "$IDENT_MAN_PATH")")")
-}
-
-########################################################################################
-
 # Load the icons and .desktop-files:
 autodesk_fusion_shortcuts_load() {
-    # Create a .desktop file (launcher.sh) for Autodesk Fusion!
-    DESKTOP_DIRECTORY="$HOME/.local/share/applications/wine/Programs/Autodesk"
-    mkdir -p "$DESKTOP_DIRECTORY"
-    if [ -f "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop" ]; then
-        mv "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop" "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop.bak"
+    if [ -d "$DESKTOP_DIRECTORY" ]; then
+        local -A EXISTING_IDS=()
+        for DIR in "$DESKTOP_DIRECTORY/"*; do
+            if [ ! -d "$DIR" ]; then
+                continue
+            fi
+            local NAME
+            NAME="$(basename "$DIR")"
+            if [[ "$NAME" =~ ^[0-9]+$ ]]; then
+                EXISTING_IDS["$NAME"]=1
+                    # Deactivate .desktop files in this directory
+                    if [ -f "$DIR/Autodesk Fusion.desktop" ]; then
+                        mv "$DIR/Autodesk Fusion.desktop" "$DIR/Autodesk Fusion.desktop.bak"
+                    fi
+                    if [ -f "$DIR/adskidmgr-opener.desktop" ]; then
+                        mv "$DIR/adskidmgr-opener.desktop" "$DIR/adskidmgr-opener.desktop.bak"
+                    fi
+            fi
+        done
+        local NEW_ID=1
+        while [[ -n "${EXISTING_IDS[$NEW_ID]+x}" ]]; do
+            (( NEW_ID++ ))
+        done
+    else
+        local NEW_ID=1
     fi
-    cp "$SELECTED_DIRECTORY/.desktop/Autodesk Fusion.desktop" "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
-    echo "Exec=$SELECTED_DIRECTORY/bin/autodesk_fusion_launcher.sh" >> "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
-    echo "Icon=$SELECTED_DIRECTORY/resources/graphics/autodesk_fusion.svg" >> "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
-    echo "Path=$SELECTED_DIRECTORY/bin" >> "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
+
+    local SCHORTCUT_DIRECTORY="$DESKTOP_DIRECTORY/$NEW_ID"
+    mkdir -p "$SCHORTCUT_DIRECTORY"
+
+    echo "$SELECTED_DIRECTORY" >> "$SCHORTCUT_DIRECTORY/location.log"
+    chmod 444 "$SCHORTCUT_DIRECTORY/location.log"
+
+    # Create a .desktop file (launcher.sh) for Autodesk Fusion!
+    cp "$SELECTED_DIRECTORY/.desktop/Autodesk Fusion.desktop" "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
+    echo "Exec=$SELECTED_DIRECTORY/bin/autodesk_fusion_launcher.sh" >> "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
+    echo "Icon=$SELECTED_DIRECTORY/resources/graphics/autodesk_fusion.svg" >> "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
+    echo "Path=$SELECTED_DIRECTORY/bin" >> "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
 
     # Set the permissions for the .desktop file to read-only
-    chmod 444 "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
-
-
-    # Execute function
-    determine_variable_folder_name_for_identity_manager
+    chmod 444 "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
 
     #Create mimetype link to handle web login call backs to the Identity Manager
-    if [ -f "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop" ]; then
-        mv "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop" "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop.bak"
-    fi
-    cp "$SELECTED_DIRECTORY/.desktop/adskidmgr-opener.desktop" "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
+    cp "$SELECTED_DIRECTORY/.desktop/adskidmgr-opener.desktop" "$SCHORTCUT_DIRECTORY/adskidmgr-opener.desktop"
     if [ -n "$PROTON_VERSION" ]; then
-        echo "Exec=sh -c 'env STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run \"\$(find $WINE_PFX -name AdskIdentityManager.exe | head -1)\" \"%u\"'" >> "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
+        echo "Exec=sh -c 'env STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run \"\$(find $WINE_PFX -name AdskIdentityManager.exe | head -1)\" \"%u\"'" >> "$SCHORTCUT_DIRECTORY/adskidmgr-opener.desktop"
     else
-        echo "Exec=sh -c 'env WINEPREFIX=$WINE_PFX wine \"\$(find $WINE_PFX -name AdskIdentityManager.exe | head -1)\" \"%u\"'" >> "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
+        echo "Exec=sh -c 'env WINEPREFIX=$WINE_PFX wine \"\$(find $WINE_PFX -name AdskIdentityManager.exe | head -1)\" \"%u\"'" >> "$SCHORTCUT_DIRECTORY/adskidmgr-opener.desktop"
     fi
 
     #Set the permissions for the .desktop file to read-only
-    chmod 444 "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop"
+    chmod 444 "$SCHORTCUT_DIRECTORY/adskidmgr-opener.desktop"
     
     #Set the mimetype handler for the Identity Manager
     xdg-mime default adskidmgr-opener.desktop x-scheme-handler/adskidmgr
 
     #Disable Debug messages on regular runs, we dont have a terminal, so speed up the system by not wasting time prining them into the Void
-    sed -i 's/=env WINEPREFIX=/=env WINEDEBUG=-all env WINEPREFIX=/g' "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
+    sed -i 's/=env WINEPREFIX=/=env WINEDEBUG=-all env WINEPREFIX=/g' "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
 }
 
 ###############################################################################################################################################################
@@ -1354,6 +1455,7 @@ autodesk_fusion_safe_logfile() {
     else
         echo "Wine" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
     fi
+    echo "$SELECTED_DIRECTORY" >> "$DESKTOP_DIRECTORY/installs.log"
 }
 
 ##############################################################################################################################################################################
