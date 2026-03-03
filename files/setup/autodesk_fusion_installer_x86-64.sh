@@ -817,7 +817,7 @@ check_install_firefox_deb() {
             echo "Proceeding with the uninstallation of the Snap version and installation of the DEB version..."
 
             # Uninstall Firefox Snap
-            sudo snap remove -y firefox
+            sudo snap remove firefox
 
             # Create an APT keyring directory if it doesn't exist
             sudo install -d -m 0755 /etc/apt/keyrings
