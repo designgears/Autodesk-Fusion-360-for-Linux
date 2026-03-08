@@ -29,7 +29,7 @@ DOWNLOAD_EXTENSIONS=0
 PROTON_VERSION=""
 DESKTOP_DIRECTORY="$HOME/.local/share/applications/wine/Programs/Autodesk"
 
-if [ "$SELECTED_DIRECTORY" == "--default" ]; then
+if [ -z "$SELECTED_DIRECTORY" ] || [ "$SELECTED_DIRECTORY" == "--default" ]; then
     SELECTED_DIRECTORY="$HOME/.autodesk_fusion"
 fi
 
@@ -735,8 +735,12 @@ check_gpu_vram() {
 ##############################################################################################################################################################################
 
 check_disk_space() {
-    # Get the free disk space in the selected directory
-    GET_DISK_SPACE=$(df -h "$SELECTED_DIRECTORY" 2>/dev/null | awk 'NR==2 {print $4}')
+    # Get the free disk space in the selected directory (or its closest existing parent)
+    DISK_CHECK_DIR="$SELECTED_DIRECTORY"
+    while [[ ! -d "$DISK_CHECK_DIR" ]] && [[ "$DISK_CHECK_DIR" != "/" ]]; do
+        DISK_CHECK_DIR="$(dirname "$DISK_CHECK_DIR")"
+    done
+    GET_DISK_SPACE=$(df -h "$DISK_CHECK_DIR" 2>/dev/null | awk 'NR==2 {print $4}')
 
     if [[ -z "$GET_DISK_SPACE" ]]; then
         echo -e "${RED}Failed to retrieve disk space information. Ensure the directory exists and try again.${NOCOLOR}"
@@ -1355,7 +1359,7 @@ wine_autodesk_fusion_install() {
         STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run -- wineboot -u
     fi
     echo -e "$(gettext "${YELLOW}Setting up the Wine prefix for Autodesk Fusion 360 in Sandbox... (suppressed)${NOCOLOR}")"
-    WINEPREFIX="$WINE_PFX" wineboot -u
+    WINEDEBUG=-all WINEPREFIX="$WINE_PFX" wineboot -u 2>> "$SELECTED_DIRECTORY/logs/wineboot.log"
     DRIVE_PATH="$WINE_PFX/dosdevices/g:"
     if [ ! -L "$DRIVE_PATH" ]; then
         mkdir -p "$WINE_PFX/dosdevices"
@@ -1369,12 +1373,10 @@ wine_autodesk_fusion_install() {
 
     echo -e "$(gettext "${YELLOW}Configuring the Wine prefix for Autodesk Fusion 360...${NOCOLOR}")"
     sleep 5
-    # If Mono or Gecko were not installed correctly in your Wine prefix:
-    WINEPREFIX="$WINE_PFX" wine control.exe appwiz.cpl install_mono
-    WINEPREFIX="$WINE_PFX" wine control.exe appwiz.cpl install_gecko
-    sleep 5
+    # Wine Mono and Gecko are auto-installed by wineboot -u above; explicit install_mono/install_gecko
+    # calls via control.exe are redundant and trigger broken mscorwks WOW64 registration on Wine 11+.
     # We must install some packages!
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q atmlib gdiplus corefonts cjkfonts dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet452.log"
+    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q atmlib gdiplus corefonts cjkfonts msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet452.log"
     # We must install cjkfonts again then sometimes it doesn't work in the first time!
     echo -e "$(gettext "${YELLOW}Re-installing cjkfonts... (suppressed)${NOCOLOR}")"
     sleep 5
@@ -1385,19 +1387,19 @@ wine_autodesk_fusion_install() {
     WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q win11 >> "$SELECTED_DIRECTORY/logs/winetricks_win11.log" 2>&1
     # Remove tracking metrics/calling home
     sleep 5
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f
+    WINEDEBUG=-all WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f 2>/dev/null
     # Navigation bar does not work well with anything other than the wine builtin DX9
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "AdCefWebBrowser.exe" /t REG_SZ /d builtin /f
+    WINEDEBUG=-all WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "AdCefWebBrowser.exe" /t REG_SZ /d builtin /f 2>/dev/null
     # Use Visual Studio Redist that is bundled with the application
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "msvcp140" /t REG_SZ /d native /f
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "mfc140u" /t REG_SZ /d native /f
+    WINEDEBUG=-all WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "msvcp140" /t REG_SZ /d native /f 2>/dev/null
+    WINEDEBUG=-all WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "mfc140u" /t REG_SZ /d native /f 2>/dev/null
     # Fixed the problem with the bcp47langs issue and now the login works again!
-    WINEPREFIX="$WINE_PFX" wine reg add "HKCU\Software\Wine\DllOverrides" /v "bcp47langs" /t REG_SZ /d "" /f
+    WINEDEBUG=-all WINEPREFIX="$WINE_PFX" wine reg add "HKCU\Software\Wine\DllOverrides" /v "bcp47langs" /t REG_SZ /d "" /f 2>/dev/null
     sleep 5
     # Install 7-Zip inside the Wine prefix via winetricks.
     # This method does NOT require 7-Zip on the host system and is more stable/reliable than previous approaches.
     WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q 7zip >> "$SELECTED_DIRECTORY/logs/winetricks_7zip.log" 2>&1
-    WINEPREFIX="$WINE_PFX" wine "$WINE_PFX/drive_c/Program Files/7-Zip/7z.exe" x "C:\\users\\$USER\\Downloads\\Qt6WebEngineCore.dll.7z" -o"C:\\users\\$USER\\Downloads\\"
+    WINEDEBUG=-all WINEPREFIX="$WINE_PFX" wine "$WINE_PFX/drive_c/Program Files/7-Zip/7z.exe" x "C:\\users\\$USER\\Downloads\\Qt6WebEngineCore.dll.7z" -o"C:\\users\\$USER\\Downloads\\" 2>/dev/null
     # Disabled by Default - Configure the correct virtual desktop resolution
     # WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q vd="$MONITOR_RESOLUTION"
     # Download and install WebView2 to handle Login attempts, required even though we redirect to your default browser
