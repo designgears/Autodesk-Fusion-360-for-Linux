@@ -798,13 +798,18 @@ get_firefox_version() {
     fi
 }
 
-check_install_firefox_deb() {
-    # Function to check if Firefox is installed via Snap
-    is_snap_firefox_installed() {
-        snap list firefox &> /dev/null
-        return $?
-    }
+is_snap_firefox_installed() {
+    if ! command -v snap &>/dev/null; then
+        return 1
+    fi
+    if snap list 2>/dev/null | grep -q firefox; then
+        return 0
+    else
+        return 1
+    fi
+}
 
+check_install_firefox_deb() {
     # Check if Firefox is installed via Snap
     if is_snap_firefox_installed; then
         echo "The installed version of Firefox is from Snap."
