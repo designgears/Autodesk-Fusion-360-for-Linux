@@ -969,8 +969,15 @@ check_and_install_wine() {
     fi
 
     # Check wine status 0 and install Wine version 
-    if (( !WINE_STATUS )); then
-        DISTRO_VERSION=$(lsb_release -ds) # Check which Linux Distro is used! <-- Still in progress!!!
+    if [ "$WINE_STATUS" -eq 0 ]; then
+        # Check which Linux Distro is used; fall back to /etc/os-release on Arch and others without lsb_release
+        if command -v lsb_release &>/dev/null; then
+            DISTRO_VERSION=$(lsb_release -ds)
+        else
+            # shellcheck source=/dev/null
+            . /etc/os-release
+            DISTRO_VERSION="${NAME} ${VERSION:-}"
+        fi
         if [[ $DISTRO_VERSION == *"Arch"*"Linux"* ]] || [[ $DISTRO_VERSION == *"Manjaro"*"Linux"* ]] || [[ $DISTRO_VERSION == *"EndeavourOS"* ]] || [[ $DISTRO_VERSION == *"CachyOS"* ]]; then
             echo "Installing Wine for Arch Linux ..."
             if grep -q '^\[multilib\]$' /etc/pacman.conf; then
@@ -1455,12 +1462,8 @@ autodesk_fusion_safe_logfile() {
     echo "$GPU_DRIVER" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
     echo "$SELECTED_DIRECTORY" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
     echo "$WINE_PFX" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
-    if [ -n "$PROTON_VERSION" ]; then
-        echo "$PROTON_VERSION" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
-    else
-        echo "Wine" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
-    fi
-    echo "$SELECTED_DIRECTORY" >> "$DESKTOP_DIRECTORY/installs.log"
+    # Line 4: runtime type expected by the launcher ("Wine" or a Proton version name)
+    echo "Wine" >> "$SELECTED_DIRECTORY/logs/wineprefixes.log"
 }
 
 ##############################################################################################################################################################################
