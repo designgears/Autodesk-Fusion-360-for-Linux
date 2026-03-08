@@ -288,34 +288,67 @@ Und möchtest du später zusätzliche Funktionen oder Sprachen wie Tschechisch i
 
 - Sie benötigen eine aktive Fusion 360-Lizenz!
 
-Öffnen Sie ein Terminal und führen Sie folgenden Befehl aus, um Autodesk Fusion in der Basisversion zu installieren:
+#### Öffnen Sie ein Terminal und führen Sie folgenden Befehl aus, um Autodesk Fusion in der Basisversion zu installieren:
 
 ```
-curl -L https://raw.githubusercontent.com/cryinkfly/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default
 ```
 
-Öffnen Sie ein Terminal und führen Sie folgenden Befehl aus, um Autodesk Fusion mit allen getesteten Erweiterungen zu installieren:
+#### Öffnen Sie ein Terminal und führen Sie folgenden Befehl aus, um Autodesk Fusion mit allen getesteten Erweiterungen zu installieren:
 
 ```
-curl -L https://raw.githubusercontent.com/cryinkfly/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default --full
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default --full
 ```
 
-- Öffnen Sie ein Terminal und führen Sie folgenden Befehl zum Deinstallieren aus:
+#### Installation mit Steam Proton (experimentell)
+
+
+Alternativ zu Wine können Sie [Steam Proton](https://github.com/ValveSoftware/Proton) verwenden, um Autodesk Fusion 360 auszuführen. Dazu muss Steam installiert sein und eine kompatible Proton-Version in `~/.local/share/Steam/compatibilitytools.d/` vorhanden sein. Mit [ProtonUp-Qt](https://davidotek.github.io/protonup-qt/) können Sie Proton-Versionen einfach installieren und verwalten.
+
+Verwenden Sie den Parameter `--proton=<Version>`, um die Proton-Version anzugeben, zum Beispiel:
 
 ```
-curl -L https://raw.githubusercontent.com/cryinkfly/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --uninstall
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --proton=GE-Proton10-32 --default
 ```
 
-Alternativ können Sie Autodesk Fusion 360 als Flatpak installieren und verwenden. App: https://usebottles.com/app/#fusion
+#### Öffnen Sie ein Terminal und führen Sie diesen Befehl zum Deinstallieren aus:
 
-Für den SSO-Login-Bug verwenden Sie bitte diesen Workaround: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/460#issuecomment-2315888332
+```
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --uninstall
+```
 
-- Alternativ können Sie Fusion 360 über Distrobox auf einem Gnome Wayland-Desktop installieren: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/557
-- Jetzt können Sie Autodesk Fusion 360 auf Ihrem Linux-System verwenden!
+#### Alternativ können Sie Autodesk Fusion 360 als Flatpak-App installieren und verwenden: https://usebottles.com/app/#fusion
+
+- Falls Ihr Bildschirm in Fusion 360 weiß flackert:
+
+Wenn Fusion 360 geöffnet ist, klicken Sie in Fusion 360 und drücken Sie:
+
+```
+Alt + Strg + N
+```
+
+Wenn Fusion 360 geschlossen ist, führen Sie Folgendes aus:
+
+```
+~/.autodesk_fusion/bin/fix-navbar-flicker.sh
+```
+
+- Für den SSO-Login-Fehler verwenden Sie bitte diesen Workaround: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/460#issuecomment-2315888332
+- Falls der Login nicht funktioniert und Sie das Installationsskript bereits verwendet haben, versuchen Sie, die alte Identity-Manager-Desktopdatei zu entfernen:
+
+```
+rm "$HOME/.local/share/applications/wine/Programs/Autodesk/Autodesk Fusion.desktop"
+rm "$HOME/.local/share/applications/wine/Programs/Autodesk/adskidmgr-opener.desktop"
+rm "$HOME/.local/share/applications/adskidmgr-opener.desktop"
+```
+
+- Alternativ können Sie Fusion 360 über Distrobox auf einem Gnome-Wayland-Desktop installieren: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/557
+
+- Jetzt können Sie <a href="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/44#issuecomment-890552181">Autodesk Fusion 360 auf Ihrem Linux-System verwenden</a>!
 
 ### Welche Skriptversionen sind verfügbar?
 
-Es sind einige <a href="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/src/branch/main/files/builds">Skript-Releases</a> verfügbar, die aus den Release-Zielen erstellt wurden. Anfängern wird empfohlen, mit den stabilen Builds zu beginnen. Entwicklungs-Builds sind bei Bedarf hier verfügbar, können aber entsprechend weniger stabil sein. Im <a href="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/src/branch/main/files/builds/dev-branch">Entwicklungszweig</a> finden Sie beispielsweise die kommenden Versionen meines Einrichtungsassistenten sowie Builds, die mithilfe von Flatpak oder Docker/Podman ausgeführt werden können.
+Es sind einige <a href="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/src/branch/main/files/builds">Skriptversionen</a> verfügbar, die aus den Release-Zielen erstellt wurden. Anfängern wird empfohlen, mit den stabilen Versionen zu beginnen. Entwicklungsversionen sind bei Bedarf hier verfügbar, können aber entsprechend weniger stabil sein. Im <a href="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/src/branch/main/files/builds/dev-branch">Entwicklungszweig</a> finden Sie beispielsweise die kommenden Versionen meines Einrichtungsassistenten sowie Builds, die mit Hilfe von Flatpak oder Docker/Podman ausgeführt werden.
 
 ---
 
