@@ -735,8 +735,12 @@ check_gpu_vram() {
 ##############################################################################################################################################################################
 
 check_disk_space() {
-    # Get the free disk space in the selected directory
-    GET_DISK_SPACE=$(df -h "$SELECTED_DIRECTORY" 2>/dev/null | awk 'NR==2 {print $4}')
+    # Get the free disk space in the selected directory (or its closest existing parent)
+    DISK_CHECK_DIR="$SELECTED_DIRECTORY"
+    while [[ ! -d "$DISK_CHECK_DIR" ]] && [[ "$DISK_CHECK_DIR" != "/" ]]; do
+        DISK_CHECK_DIR="$(dirname "$DISK_CHECK_DIR")"
+    done
+    GET_DISK_SPACE=$(df -h "$DISK_CHECK_DIR" 2>/dev/null | awk 'NR==2 {print $4}')
 
     if [[ -z "$GET_DISK_SPACE" ]]; then
         echo -e "${RED}Failed to retrieve disk space information. Ensure the directory exists and try again.${NOCOLOR}"
@@ -798,13 +802,18 @@ get_firefox_version() {
     fi
 }
 
-check_install_firefox_deb() {
-    # Function to check if Firefox is installed via Snap
-    is_snap_firefox_installed() {
-        snap list firefox &> /dev/null
-        return $?
-    }
+is_snap_firefox_installed() {
+    if ! command -v snap &>/dev/null; then
+        return 1
+    fi
+    if snap list 2>/dev/null | grep -q firefox; then
+        return 0
+    else
+        return 1
+    fi
+}
 
+check_install_firefox_deb() {
     # Check if Firefox is installed via Snap
     if is_snap_firefox_installed; then
         echo "The installed version of Firefox is from Snap."
@@ -965,7 +974,14 @@ check_and_install_wine() {
 
     # Check wine status 0 and install Wine version 
     if (( !WINE_STATUS )); then
-        DISTRO_VERSION=$(lsb_release -ds) # Check which Linux Distro is used! <-- Still in progress!!!
+        # Check which Linux Distro is used; fall back to /etc/os-release on Arch and others without lsb_release
+        if command -v lsb_release &>/dev/null; then
+            DISTRO_VERSION=$(lsb_release -ds)
+        else
+            # shellcheck source=/dev/null
+            . /etc/os-release
+            DISTRO_VERSION="${NAME} ${VERSION:-}"
+        fi
         if [[ $DISTRO_VERSION == *"Arch"*"Linux"* ]] || [[ $DISTRO_VERSION == *"Manjaro"*"Linux"* ]] || [[ $DISTRO_VERSION == *"EndeavourOS"* ]] || [[ $DISTRO_VERSION == *"CachyOS"* ]]; then
             echo "Installing Wine for Arch Linux ..."
             if grep -q '^\[multilib\]$' /etc/pacman.conf; then
@@ -1371,9 +1387,13 @@ wine_autodesk_fusion_install() {
     echo -e "$(gettext "${YELLOW}Configuring the Wine prefix for Autodesk Fusion 360...${NOCOLOR}")"
     sleep 5
     # If Mono or Gecko were not installed correctly in your Wine prefix:
-    "$WINE" control.exe appwiz.cpl install_mono
-    "$WINE" control.exe appwiz.cpl install_gecko
-    sleep 5
+    #"$WINE" control.exe appwiz.cpl install_mono
+    #"$WINE" control.exe appwiz.cpl install_gecko
+    #sleep 5
+
+    # Wine Mono and Gecko are auto-installed by wineboot -u above; explicit install_mono/install_gecko
+    # calls via control.exe are redundant and trigger broken mscorwks WOW64 registration on Wine 11+.
+
     # We must install some packages!
     "$WINETRICKS" -q atmlib gdiplus corefonts cjkfonts dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet48.log"
     # We must install cjkfonts again then sometimes it doesn't work in the first time!
