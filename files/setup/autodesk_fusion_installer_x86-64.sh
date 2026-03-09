@@ -1249,9 +1249,6 @@ autodesk_fusion_shortcuts_load() {
     
     #Set the mimetype handler for the Identity Manager
     xdg-mime default adskidmgr-opener.desktop x-scheme-handler/adskidmgr
-
-    #Disable Debug messages on regular runs, we dont have a terminal, so speed up the system by not wasting time prining them into the Void
-    sed -i 's/=env WINEPREFIX=/=env WINEDEBUG=-all env WINEPREFIX=/g' "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
 }
 
 ###############################################################################################################################################################
