@@ -1222,6 +1222,7 @@ autodesk_fusion_shortcuts_load() {
 
     local SCHORTCUT_DIRECTORY="$DESKTOP_DIRECTORY/$NEW_ID"
     mkdir -p "$SCHORTCUT_DIRECTORY"
+    rm -f "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop"
 
     echo "$SELECTED_DIRECTORY" >> "$SCHORTCUT_DIRECTORY/location.log"
     chmod 444 "$SCHORTCUT_DIRECTORY/location.log"
