@@ -39,7 +39,7 @@ if [ "$SELECTED_EXTENSIONS" == "--full" ]; then
     DOWNLOAD_EXTENSIONS=1
 fi
 
-REPO_URL="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main"
+REPO_URL="https://codeberg.org/Lolig4/Autodesk-Fusion-360-on-Linux/raw/branch/main"
 
 # URL to download translations po. files <-- Still in progress!!!
 UPDATER_TRANSLATIONS_URL="$REPO_URL/files/setup/locale/update-locale.sh"
@@ -1259,10 +1259,10 @@ autodesk_fusion_shortcuts_load() {
 autodesk_fusion_run_install_client() {
     echo -e "$(gettext "${YELLOW}Installing Autodesk Fusion 360 Client ...${NOCOLOR}")"
     sleep 2
-    WINEPREFIX="$WINE_PFX" timeout -k 10m 9m wine "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_1.log"
+    timeout -k 10m 9m "$WINE" "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_1.log"
     sleep 5
     echo -e "$(gettext "${YELLOW}Finalizing Autodesk Fusion 360 installation...${NOCOLOR}")"
-    WINEPREFIX="$WINE_PFX" timeout -k 5m 1m wine "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_2.log"
+    timeout -k 5m 1m "$WINE" "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_2.log"
     echo -e "$(gettext "${GREEN}Autodesk Fusion 360 Client installation completed!${NOCOLOR}")"
 }
 
@@ -1326,6 +1326,12 @@ wine_autodesk_fusion_install() {
     # It protects against errors rather than malice. It's useful for, e.g., keeping games from saving their settings in random subdirectories of your home directory.
     # But it still ensures that wine, for example, no longer has access permissions to Home!
     # For this reason, the EXE files must be located directly in the Wineprefix folder!
+
+    WINE="wine"
+    WINESERVER="wineserver"
+    WINETRICKS="$SELECTED_DIRECTORY/bin/winetricks"
+    export WINEPREFIX="$WINE_PFX"
+
     if [ -n "$PROTON_VERSION" ]; then
         echo -e "$(gettext "${YELLOW}Init Proton...${NOCOLOR}")"
         if ! pgrep -x steam >/dev/null 2>&1; then
@@ -1340,58 +1346,65 @@ wine_autodesk_fusion_install() {
             sleep 5
         fi
         USER="steamuser"
-        STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run -- wineboot -u
+        WINE="$PROTON_DIRECTORY/files/bin/wine"
+        WINESERVER="$PROTON_DIRECTORY/files/bin/wineserver"
+        export WINE WINESERVER
+        STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run wineboot --init
+    else
+        wineboot --init
     fi
+
+    "$WINESERVER" -w
+
     echo -e "$(gettext "${YELLOW}Setting up the Wine prefix for Autodesk Fusion 360 in Sandbox... (suppressed)${NOCOLOR}")"
-    WINEPREFIX="$WINE_PFX" wineboot -u
     DRIVE_PATH="$WINE_PFX/dosdevices/g:"
     if [ ! -L "$DRIVE_PATH" ]; then
         mkdir -p "$WINE_PFX/dosdevices"
         ln -s "/" "$DRIVE_PATH"
     fi
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q sandbox >> "$SELECTED_DIRECTORY/logs/winetricks_sandbox.log" 2>&1
+    "$WINETRICKS" -q sandbox >> "$SELECTED_DIRECTORY/logs/winetricks_sandbox.log" 2>&1
 
     echo -e "$(gettext "${YELLOW}Linking the downloads folder to the Wine prefix...${NOCOLOR}")"
-    rm -r "$WINE_PFX/drive_c/users/$USER/Downloads"
+    rm -rf "$WINE_PFX/drive_c/users/$USER/Downloads"
     ln -s "$SELECTED_DIRECTORY/downloads" "$WINE_PFX/drive_c/users/$USER/Downloads"
 
     echo -e "$(gettext "${YELLOW}Configuring the Wine prefix for Autodesk Fusion 360...${NOCOLOR}")"
     sleep 5
     # If Mono or Gecko were not installed correctly in your Wine prefix:
-    WINEPREFIX="$WINE_PFX" wine control.exe appwiz.cpl install_mono
-    WINEPREFIX="$WINE_PFX" wine control.exe appwiz.cpl install_gecko
+    "$WINE" control.exe appwiz.cpl install_mono
+    "$WINE" control.exe appwiz.cpl install_gecko
     sleep 5
     # We must install some packages!
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q atmlib gdiplus corefonts cjkfonts dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet452.log"
+    "$WINETRICKS" -q atmlib gdiplus corefonts cjkfonts dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet48.log"
     # We must install cjkfonts again then sometimes it doesn't work in the first time!
     echo -e "$(gettext "${YELLOW}Re-installing cjkfonts... (suppressed)${NOCOLOR}")"
     sleep 5
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q cjkfonts >> "$SELECTED_DIRECTORY/logs/winetricks_cjkfonts_2.log" 2>&1
+    "$WINETRICKS" -q cjkfonts >> "$SELECTED_DIRECTORY/logs/winetricks_cjkfonts_2.log" 2>&1
     # We must set to Windows 10 or 11 again because some other winetricks sometimes set it back to Windows XP!
     echo -e "$(gettext "${YELLOW}Setting Windows 11 as the Windows version... (suppressed)${NOCOLOR}")"
     sleep 5
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q win11 >> "$SELECTED_DIRECTORY/logs/winetricks_win11.log" 2>&1
+    "$WINETRICKS" -q win11 >> "$SELECTED_DIRECTORY/logs/winetricks_win11.log" 2>&1
     # Remove tracking metrics/calling home
     sleep 5
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f
     # Navigation bar does not work well with anything other than the wine builtin DX9
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "AdCefWebBrowser.exe" /t REG_SZ /d builtin /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "AdCefWebBrowser.exe" /t REG_SZ /d builtin /f
     # Use Visual Studio Redist that is bundled with the application
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "msvcp140" /t REG_SZ /d native /f
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "mfc140u" /t REG_SZ /d native /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "msvcp140" /t REG_SZ /d native /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "mfc140u" /t REG_SZ /d native /f
     # Fixed the problem with the bcp47langs issue and now the login works again!
-    WINEPREFIX="$WINE_PFX" wine reg add "HKCU\Software\Wine\DllOverrides" /v "bcp47langs" /t REG_SZ /d "" /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "bcp47langs" /t REG_SZ /d "" /f
     sleep 5
     # Install 7-Zip inside the Wine prefix via winetricks.
     # This method does NOT require 7-Zip on the host system and is more stable/reliable than previous approaches.
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q 7zip >> "$SELECTED_DIRECTORY/logs/winetricks_7zip.log" 2>&1
-    WINEPREFIX="$WINE_PFX" wine "$WINE_PFX/drive_c/Program Files/7-Zip/7z.exe" x "C:\\users\\$USER\\Downloads\\Qt6WebEngineCore.dll.7z" -o"C:\\users\\$USER\\Downloads\\"
+    "$WINETRICKS" -q 7zip >> "$SELECTED_DIRECTORY/logs/winetricks_7zip.log" 2>&1
+    "$WINE" "$WINE_PFX/drive_c/Program Files/7-Zip/7z.exe" x "C:\\users\\$USER\\Downloads\\Qt6WebEngineCore.dll.7z" -o"C:\\users\\$USER\\Downloads\\"
     # Disabled by Default - Configure the correct virtual desktop resolution
-    # WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q vd="$MONITOR_RESOLUTION"
+    # "$WINETRICKS" -q vd="$MONITOR_RESOLUTION"
     # Download and install WebView2 to handle Login attempts, required even though we redirect to your default browser
     echo -e "$(gettext "${YELLOW}Installing Microsoft Edge WebView2 Runtime for Autodesk Fusion ...${NOCOLOR}")"
     sleep 2
-    WINEPREFIX="$WINE_PFX" wine "$SELECTED_DIRECTORY/downloads/WebView2installer.exe" /silent /install 2>> "$SELECTED_DIRECTORY/logs/WebView2_install.log"
+    "$WINE" "$SELECTED_DIRECTORY/downloads/WebView2installer.exe" /silent /install 2>> "$SELECTED_DIRECTORY/logs/WebView2_install.log"
     echo -e "$(gettext "${GREEN}Microsoft Edge WebView2 Runtime installation completed!${NOCOLOR}")"
     # Pre-create shortcut directory for latest re-branding Microsoft Edge WebView2
     APPDATA_DIRECTORY="$WINE_PFX/drive_c/users/$USER/AppData"
@@ -1399,9 +1412,9 @@ wine_autodesk_fusion_install() {
     mkdir -p "$APPDATA_DIRECTORY/Roaming/Microsoft/Internet Explorer/Quick Launch/User Pinned"
 
     if [[ $GPU_DRIVER = "DXVK" ]]; then
-        WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q dxvk
+        "$WINETRICKS" -q dxvk
         # Add the "return"-option. Here you can read more about it -> https://github.com/koalaman/shellcheck/issues/592
-        WINEPREFIX="$WINE_PFX" wine regedit.exe "C:\\users\\$USER\\Downloads\\DXVK\\DXVK.reg"
+        "$WINE" regedit.exe "C:\\users\\$USER\\Downloads\\DXVK\\DXVK.reg"
     fi
     autodesk_fusion_run_install_client
     mkdir -p "$APPDATA_DIRECTORY/Roaming/Autodesk/Neutron Platform/Options"
@@ -1437,9 +1450,9 @@ run_install_extension_client() {
     local EXTENSION_FILE="$1"
     local WIN_EXTENSION_DIRECTORY="C:\\users\\$USER\\Downloads\\extensions"
     if [[ "$EXTENSION_FILE" == *.msi ]]; then
-        WINEPREFIX="$WINE_PFX" wine msiexec /i "$WIN_EXTENSION_DIRECTORY\\$EXTENSION_FILE" /quiet
+        "$WINE" msiexec /i "$WIN_EXTENSION_DIRECTORY\\$EXTENSION_FILE" /quiet
     else
-        WINEPREFIX="$WINE_PFX" wine "$SELECTED_DIRECTORY/downloads/$EXTENSION_FILE"
+        "$WINE" "$SELECTED_DIRECTORY/downloads/$EXTENSION_FILE"
     fi
 }
 
