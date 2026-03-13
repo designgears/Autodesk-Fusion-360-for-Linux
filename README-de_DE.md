@@ -195,8 +195,8 @@ Als Fan von sowohl Fusion 360 als auch Linux bin ich begeistert, meinen Teil daz
        <li><p>Red Hat Enterprise Linux 9.x</p></li>
        <li><p>Red Hat Enterprise Linux 10.x</p></li>
        <li><p>Ubuntu 20.04, Linux Mint 20.x, Pop!_OS 20.04, ...</p></li>
-       <li><p>Ubuntu 22.04, Pop!_OS 22.04, ...</p></li>
-       <li><p>Ubuntu 24.04, Pop!_OS 24.04, ...</p></li>
+       <li><p>Ubuntu 22.04, Pop!_OS 22.04, Zorin OS 17.x, ...</p></li>
+       <li><p>Ubuntu 24.04, Pop!_OS 24.04, Zorin OS 18.x, ...</p></li>
        <li><p>Ubuntu 25.04, ...</p></li>
        <li><p>NixOS</p></li>
        <li><p>Solus</p></li>
