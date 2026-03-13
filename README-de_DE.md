@@ -334,13 +334,6 @@ Wenn Fusion 360 geschlossen ist, führen Sie Folgendes aus:
 ```
 
 - Für den SSO-Login-Fehler verwenden Sie bitte diesen Workaround: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/460#issuecomment-2315888332
-- Falls der Login nicht funktioniert und Sie das Installationsskript bereits verwendet haben, versuchen Sie, die alte Identity-Manager-Desktopdatei zu entfernen:
-
-```
-rm "$HOME/.local/share/applications/wine/Programs/Autodesk/Autodesk Fusion.desktop"
-rm "$HOME/.local/share/applications/wine/Programs/Autodesk/adskidmgr-opener.desktop"
-rm "$HOME/.local/share/applications/adskidmgr-opener.desktop"
-```
 
 - Alternativ können Sie Fusion 360 über Distrobox auf einem Gnome-Wayland-Desktop installieren: https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/issues/557
 

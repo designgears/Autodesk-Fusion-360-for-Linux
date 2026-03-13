@@ -735,8 +735,12 @@ check_gpu_vram() {
 ##############################################################################################################################################################################
 
 check_disk_space() {
-    # Get the free disk space in the selected directory
-    GET_DISK_SPACE=$(df -h "$SELECTED_DIRECTORY" 2>/dev/null | awk 'NR==2 {print $4}')
+    # Get the free disk space in the selected directory (or its closest existing parent)
+    DISK_CHECK_DIR="$SELECTED_DIRECTORY"
+    while [[ ! -d "$DISK_CHECK_DIR" ]] && [[ "$DISK_CHECK_DIR" != "/" ]]; do
+        DISK_CHECK_DIR="$(dirname "$DISK_CHECK_DIR")"
+    done
+    GET_DISK_SPACE=$(df -h "$DISK_CHECK_DIR" 2>/dev/null | awk 'NR==2 {print $4}')
 
     if [[ -z "$GET_DISK_SPACE" ]]; then
         echo -e "${RED}Failed to retrieve disk space information. Ensure the directory exists and try again.${NOCOLOR}"
@@ -798,13 +802,18 @@ get_firefox_version() {
     fi
 }
 
-check_install_firefox_deb() {
-    # Function to check if Firefox is installed via Snap
     is_snap_firefox_installed() {
-        snap list firefox &> /dev/null
-        return $?
+    if ! command -v snap &>/dev/null; then
+        return 1
+    fi
+    if snap list 2>/dev/null | grep -q firefox; then
+        return 0
+    else
+        return 1
+    fi
     }
 
+check_install_firefox_deb() {
     # Check if Firefox is installed via Snap
     if is_snap_firefox_installed; then
         echo "The installed version of Firefox is from Snap."
@@ -965,7 +974,14 @@ check_and_install_wine() {
 
     # Check wine status 0 and install Wine version 
     if (( !WINE_STATUS )); then
-        DISTRO_VERSION=$(lsb_release -ds) # Check which Linux Distro is used! <-- Still in progress!!!
+        # Check which Linux Distro is used; fall back to /etc/os-release on Arch and others without lsb_release
+        if command -v lsb_release &>/dev/null; then
+            DISTRO_VERSION=$(lsb_release -ds)
+        else
+            # shellcheck source=/dev/null
+            . /etc/os-release
+            DISTRO_VERSION="${NAME} ${VERSION:-}"
+        fi
         if [[ $DISTRO_VERSION == *"Arch"*"Linux"* ]] || [[ $DISTRO_VERSION == *"Manjaro"*"Linux"* ]] || [[ $DISTRO_VERSION == *"EndeavourOS"* ]] || [[ $DISTRO_VERSION == *"CachyOS"* ]]; then
             echo "Installing Wine for Arch Linux ..."
             if grep -q '^\[multilib\]$' /etc/pacman.conf; then
@@ -1222,6 +1238,9 @@ autodesk_fusion_shortcuts_load() {
 
     local SCHORTCUT_DIRECTORY="$DESKTOP_DIRECTORY/$NEW_ID"
     mkdir -p "$SCHORTCUT_DIRECTORY"
+    rm -f "$DESKTOP_DIRECTORY/Autodesk Fusion.desktop" # Is Necessary!
+    rm -f "$DESKTOP_DIRECTORY/adskidmgr-opener.desktop" # Clean up old desktop files from older versions of the installer.
+    rm -f "$HOME/.local/share/applications/adskidmgr-opener.desktop" # Clean up old desktop files from older versions of the installer.
 
     echo "$SELECTED_DIRECTORY" >> "$SCHORTCUT_DIRECTORY/location.log"
     chmod 444 "$SCHORTCUT_DIRECTORY/location.log"
@@ -1248,9 +1267,6 @@ autodesk_fusion_shortcuts_load() {
     
     #Set the mimetype handler for the Identity Manager
     xdg-mime default adskidmgr-opener.desktop x-scheme-handler/adskidmgr
-
-    #Disable Debug messages on regular runs, we dont have a terminal, so speed up the system by not wasting time prining them into the Void
-    sed -i 's/=env WINEPREFIX=/=env WINEDEBUG=-all env WINEPREFIX=/g' "$SCHORTCUT_DIRECTORY/Autodesk Fusion.desktop"
 }
 
 ###############################################################################################################################################################
@@ -1259,10 +1275,10 @@ autodesk_fusion_shortcuts_load() {
 autodesk_fusion_run_install_client() {
     echo -e "$(gettext "${YELLOW}Installing Autodesk Fusion 360 Client ...${NOCOLOR}")"
     sleep 2
-    WINEPREFIX="$WINE_PFX" timeout -k 10m 9m wine "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_1.log"
+    timeout -k 10m 9m "$WINE" "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_1.log"
     sleep 5
     echo -e "$(gettext "${YELLOW}Finalizing Autodesk Fusion 360 installation...${NOCOLOR}")"
-    WINEPREFIX="$WINE_PFX" timeout -k 5m 1m wine "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_2.log"
+    timeout -k 5m 1m "$WINE" "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_2.log"
     echo -e "$(gettext "${GREEN}Autodesk Fusion 360 Client installation completed!${NOCOLOR}")"
 }
 
@@ -1326,6 +1342,12 @@ wine_autodesk_fusion_install() {
     # It protects against errors rather than malice. It's useful for, e.g., keeping games from saving their settings in random subdirectories of your home directory.
     # But it still ensures that wine, for example, no longer has access permissions to Home!
     # For this reason, the EXE files must be located directly in the Wineprefix folder!
+
+    WINE="wine"
+    WINESERVER="wineserver"
+    WINETRICKS="$SELECTED_DIRECTORY/bin/winetricks"
+    export WINEPREFIX="$WINE_PFX"
+
     if [ -n "$PROTON_VERSION" ]; then
         echo -e "$(gettext "${YELLOW}Init Proton...${NOCOLOR}")"
         if ! pgrep -x steam >/dev/null 2>&1; then
@@ -1340,58 +1362,69 @@ wine_autodesk_fusion_install() {
             sleep 5
         fi
         USER="steamuser"
-        STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run -- wineboot -u
+        WINE="$PROTON_DIRECTORY/files/bin/wine"
+        WINESERVER="$PROTON_DIRECTORY/files/bin/wineserver"
+        export WINE WINESERVER
+        STEAM_COMPAT_CLIENT_INSTALL_PATH="$STEAM_DIRECTORY" STEAM_COMPAT_DATA_PATH="$PROTONPREFIX_DIRECTORY" "$PROTON_DIRECTORY/proton" run wineboot --init
+    else
+        wineboot --init
     fi
+
+    "$WINESERVER" -w
+
     echo -e "$(gettext "${YELLOW}Setting up the Wine prefix for Autodesk Fusion 360 in Sandbox... (suppressed)${NOCOLOR}")"
-    WINEPREFIX="$WINE_PFX" wineboot -u
     DRIVE_PATH="$WINE_PFX/dosdevices/g:"
     if [ ! -L "$DRIVE_PATH" ]; then
         mkdir -p "$WINE_PFX/dosdevices"
         ln -s "/" "$DRIVE_PATH"
     fi
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q sandbox >> "$SELECTED_DIRECTORY/logs/winetricks_sandbox.log" 2>&1
+    "$WINETRICKS" -q sandbox >> "$SELECTED_DIRECTORY/logs/winetricks_sandbox.log" 2>&1
 
     echo -e "$(gettext "${YELLOW}Linking the downloads folder to the Wine prefix...${NOCOLOR}")"
-    rm -r "$WINE_PFX/drive_c/users/$USER/Downloads"
+    rm -rf "$WINE_PFX/drive_c/users/$USER/Downloads"
     ln -s "$SELECTED_DIRECTORY/downloads" "$WINE_PFX/drive_c/users/$USER/Downloads"
 
     echo -e "$(gettext "${YELLOW}Configuring the Wine prefix for Autodesk Fusion 360...${NOCOLOR}")"
     sleep 5
     # If Mono or Gecko were not installed correctly in your Wine prefix:
-    WINEPREFIX="$WINE_PFX" wine control.exe appwiz.cpl install_mono
-    WINEPREFIX="$WINE_PFX" wine control.exe appwiz.cpl install_gecko
-    sleep 5
+    #"$WINE" control.exe appwiz.cpl install_mono
+    #"$WINE" control.exe appwiz.cpl install_gecko
+    #sleep 5
+
+    # Wine Mono and Gecko are auto-installed by wineboot -u above; explicit install_mono/install_gecko
+    # calls via control.exe are redundant and trigger broken mscorwks WOW64 registration on Wine 11+.
+
     # We must install some packages!
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q atmlib gdiplus corefonts cjkfonts dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet452.log"
+    "$WINETRICKS" -q atmlib gdiplus corefonts cjkfonts dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet48.log"
     # We must install cjkfonts again then sometimes it doesn't work in the first time!
     echo -e "$(gettext "${YELLOW}Re-installing cjkfonts... (suppressed)${NOCOLOR}")"
     sleep 5
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q cjkfonts >> "$SELECTED_DIRECTORY/logs/winetricks_cjkfonts_2.log" 2>&1
+    "$WINETRICKS" -q cjkfonts >> "$SELECTED_DIRECTORY/logs/winetricks_cjkfonts_2.log" 2>&1
     # We must set to Windows 10 or 11 again because some other winetricks sometimes set it back to Windows XP!
     echo -e "$(gettext "${YELLOW}Setting Windows 11 as the Windows version... (suppressed)${NOCOLOR}")"
     sleep 5
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q win11 >> "$SELECTED_DIRECTORY/logs/winetricks_win11.log" 2>&1
+    "$WINETRICKS" -q win11 >> "$SELECTED_DIRECTORY/logs/winetricks_win11.log" 2>&1
     # Remove tracking metrics/calling home
     sleep 5
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "adpclientservice.exe" /t REG_SZ /d native /f
     # Navigation bar does not work well with anything other than the wine builtin DX9
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "AdCefWebBrowser.exe" /t REG_SZ /d builtin /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "AdCefWebBrowser.exe" /t REG_SZ /d builtin /f
     # Use Visual Studio Redist that is bundled with the application
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "msvcp140" /t REG_SZ /d native /f
-    WINEPREFIX="$WINE_PFX" wine REG ADD "HKCU\Software\Wine\DllOverrides" /v "mfc140u" /t REG_SZ /d native /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "msvcp140" /t REG_SZ /d native /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "mfc140u" /t REG_SZ /d native /f
     # Fixed the problem with the bcp47langs issue and now the login works again!
-    WINEPREFIX="$WINE_PFX" wine reg add "HKCU\Software\Wine\DllOverrides" /v "bcp47langs" /t REG_SZ /d "" /f
+    "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "bcp47langs" /t REG_SZ /d "" /f
     sleep 5
     # Install 7-Zip inside the Wine prefix via winetricks.
     # This method does NOT require 7-Zip on the host system and is more stable/reliable than previous approaches.
-    WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q 7zip >> "$SELECTED_DIRECTORY/logs/winetricks_7zip.log" 2>&1
-    WINEPREFIX="$WINE_PFX" wine "$WINE_PFX/drive_c/Program Files/7-Zip/7z.exe" x "C:\\users\\$USER\\Downloads\\Qt6WebEngineCore.dll.7z" -o"C:\\users\\$USER\\Downloads\\"
+    "$WINETRICKS" -q 7zip >> "$SELECTED_DIRECTORY/logs/winetricks_7zip.log" 2>&1
+    "$WINE" "$WINE_PFX/drive_c/Program Files/7-Zip/7z.exe" x "C:\\users\\$USER\\Downloads\\Qt6WebEngineCore.dll.7z" -o"C:\\users\\$USER\\Downloads\\"
     # Disabled by Default - Configure the correct virtual desktop resolution
-    # WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q vd="$MONITOR_RESOLUTION"
+    # "$WINETRICKS" -q vd="$MONITOR_RESOLUTION"
     # Download and install WebView2 to handle Login attempts, required even though we redirect to your default browser
     echo -e "$(gettext "${YELLOW}Installing Microsoft Edge WebView2 Runtime for Autodesk Fusion ...${NOCOLOR}")"
     sleep 2
-    WINEPREFIX="$WINE_PFX" wine "$SELECTED_DIRECTORY/downloads/WebView2installer.exe" /silent /install 2>> "$SELECTED_DIRECTORY/logs/WebView2_install.log"
+    "$WINE" "$SELECTED_DIRECTORY/downloads/WebView2installer.exe" /silent /install 2>> "$SELECTED_DIRECTORY/logs/WebView2_install.log"
     echo -e "$(gettext "${GREEN}Microsoft Edge WebView2 Runtime installation completed!${NOCOLOR}")"
     # Pre-create shortcut directory for latest re-branding Microsoft Edge WebView2
     APPDATA_DIRECTORY="$WINE_PFX/drive_c/users/$USER/AppData"
@@ -1399,9 +1432,9 @@ wine_autodesk_fusion_install() {
     mkdir -p "$APPDATA_DIRECTORY/Roaming/Microsoft/Internet Explorer/Quick Launch/User Pinned"
 
     if [[ $GPU_DRIVER = "DXVK" ]]; then
-        WINEPREFIX="$WINE_PFX" sh "$SELECTED_DIRECTORY/bin/winetricks" -q dxvk
+        "$WINETRICKS" -q dxvk
         # Add the "return"-option. Here you can read more about it -> https://github.com/koalaman/shellcheck/issues/592
-        WINEPREFIX="$WINE_PFX" wine regedit.exe "C:\\users\\$USER\\Downloads\\DXVK\\DXVK.reg"
+        "$WINE" regedit.exe "C:\\users\\$USER\\Downloads\\DXVK\\DXVK.reg"
     fi
     autodesk_fusion_run_install_client
     mkdir -p "$APPDATA_DIRECTORY/Roaming/Autodesk/Neutron Platform/Options"
@@ -1437,9 +1470,9 @@ run_install_extension_client() {
     local EXTENSION_FILE="$1"
     local WIN_EXTENSION_DIRECTORY="C:\\users\\$USER\\Downloads\\extensions"
     if [[ "$EXTENSION_FILE" == *.msi ]]; then
-        WINEPREFIX="$WINE_PFX" wine msiexec /i "$WIN_EXTENSION_DIRECTORY\\$EXTENSION_FILE" /quiet
+        "$WINE" msiexec /i "$WIN_EXTENSION_DIRECTORY\\$EXTENSION_FILE" /quiet
     else
-        WINEPREFIX="$WINE_PFX" wine "$SELECTED_DIRECTORY/downloads/$EXTENSION_FILE"
+        "$WINE" "$SELECTED_DIRECTORY/downloads/$EXTENSION_FILE"
     fi
 }
 
