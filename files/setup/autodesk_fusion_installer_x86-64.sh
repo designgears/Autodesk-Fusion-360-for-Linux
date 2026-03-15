@@ -7,8 +7,8 @@
 # Author URI:   https://cryinkfly.com                                                              #
 # License:      MIT                                                                                #
 # Copyright (c) 2020-2026                                                                          #
-# Time/Date:    18:58/13.03.2026                                                                   #
-# Version:      2.1.2-Alpha                                                                        #
+# Time/Date:    11:22/15.03.2026                                                                   #
+# Version:      2.1.3-Alpha                                                                        #
 ####################################################################################################
 
 ###############################################################################################################################################################
@@ -512,7 +512,7 @@ check_option() {
             autodesk_fusion_shortcuts_load
             autodesk_fusion_safe_logfile
             reset_window_not_responding_dialog
-            xdg-open "https://cryinkfly.com/sponsors/"
+            xdg-open "https://cryinkfly.com/become-partner/"
             run_wine_autodesk_fusion
             exit;;
         *)
