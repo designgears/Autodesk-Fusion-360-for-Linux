@@ -21,16 +21,6 @@
 # ALL FUNCTIONS ARE ARRANGED HERE:                                                                                                                            #
 ###############################################################################################################################################################
 
-# Path: SELECTED__INSTALLATION_PATH/bin/autodesk_fusion_launcher.sh
-
-#################################
-# Open Autodesk Fusion 360 now! #
-#################################
-
-###############################################################################################################################################################
-# ALL FUNCTIONS ARE ARRANGED HERE:                                                                                                                            #
-###############################################################################################################################################################
-
 # Check in which directory the autodesk_fusion_launcher.sh file is located.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Make AUTODESK_ROOT_DIRECTORY absolute (one level up from the script dir)
