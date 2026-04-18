@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-DESKTOP_DIR="$HOME/.local/share/applications/wine/Programs/Autodesk"
+DESKTOP_DIRECTORY="$HOME/.local/share/applications"
+FUSION_DESKTOP_DIRECTORY="$DESKTOP_DIRECTORY/wine/Programs/Autodesk"
 
 DESKTOP_FILES=("Autodesk Fusion.desktop" "adskidmgr-opener.desktop")
 
 # Collect all numeric subdirectories, sorted
 DIRS=()
-for DIR in "$DESKTOP_DIR/"*; do
+for DIR in "$FUSION_DESKTOP_DIRECTORY/"*; do
     [ -d "$DIR" ] || continue
     NAME="$(basename "$DIR")"
     [[ "$NAME" =~ ^[0-9]+$ ]] && DIRS+=("$NAME")
@@ -20,7 +21,7 @@ fi
 # Find the currently active directory (has .desktop without .bak)
 ACTIVE=""
 for ID in "${DIRS[@]}"; do
-    if [ -f "$DESKTOP_DIR/$ID/Autodesk Fusion.desktop" ]; then
+    if [ -f "$FUSION_DESKTOP_DIRECTORY/$ID/Autodesk Fusion.desktop" ]; then
         ACTIVE="$ID"
         break
     fi
@@ -47,16 +48,16 @@ done
 
 # Deactivate current: rename .desktop -> .bak
 for FILE in "${DESKTOP_FILES[@]}"; do
-    [ -f "$DESKTOP_DIR/$ACTIVE/$FILE" ] && mv "$DESKTOP_DIR/$ACTIVE/$FILE" "$DESKTOP_DIR/$ACTIVE/$FILE.bak"
+    [ -f "$FUSION_DESKTOP_DIRECTORY/$ACTIVE/$FILE" ] && mv "$FUSION_DESKTOP_DIRECTORY/$ACTIVE/$FILE" "$FUSION_DESKTOP_DIRECTORY/$ACTIVE/$FILE.bak"
 done
 
 # Activate next: rename .bak -> .desktop
 for FILE in "${DESKTOP_FILES[@]}"; do
-    [ -f "$DESKTOP_DIR/$NEXT/$FILE.bak" ] && mv "$DESKTOP_DIR/$NEXT/$FILE.bak" "$DESKTOP_DIR/$NEXT/$FILE"
+    [ -f "$FUSION_DESKTOP_DIRECTORY/$NEXT/$FILE.bak" ] && mv "$FUSION_DESKTOP_DIRECTORY/$NEXT/$FILE.bak" "$FUSION_DESKTOP_DIRECTORY/$NEXT/$FILE"
 done
 
 # Report which type is now active
-EXEC_LINE=$(grep -m1 '^Exec=' "$DESKTOP_DIR/$NEXT/adskidmgr-opener.desktop" 2>/dev/null || true)
+EXEC_LINE=$(grep -m1 '^Exec=' "$FUSION_DESKTOP_DIRECTORY/$NEXT/adskidmgr-opener.desktop" 2>/dev/null || true)
 if [[ "$EXEC_LINE" == *proton* ]]; then
     echo "proton ($NEXT)"
 elif [[ "$EXEC_LINE" == *wine* ]]; then
@@ -64,7 +65,9 @@ elif [[ "$EXEC_LINE" == *wine* ]]; then
 else
     echo "unknown ($NEXT)"
 fi
-INSTALL_PATH=$(head -n 1 "$DESKTOP_DIR/$NEXT/location.log" 2>/dev/null)
+INSTALL_PATH=$(head -n 1 "$FUSION_DESKTOP_DIRECTORY/$NEXT/location.log" 2>/dev/null)
 if [ -n "$INSTALL_PATH" ]; then
     echo "Installation path: $INSTALL_PATH"
 fi
+
+update-desktop-database "$DESKTOP_DIRECTORY" 2>/dev/null || true
