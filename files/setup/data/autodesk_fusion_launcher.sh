@@ -22,7 +22,7 @@
 ###############################################################################################################################################################
 
 # Check in which directory the autodesk_fusion_launcher.sh file is located.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(realpath "${BASH_SOURCE[0]}")")" && pwd)"
 # Make AUTODESK_ROOT_DIRECTORY absolute (one level up from the script dir)
 AUTODESK_ROOT_DIRECTORY="$(cd "$SCRIPT_DIR/.." && pwd)"
 WINEPREFIX_LOG_FILE="$AUTODESK_ROOT_DIRECTORY/logs/wineprefixes.log"

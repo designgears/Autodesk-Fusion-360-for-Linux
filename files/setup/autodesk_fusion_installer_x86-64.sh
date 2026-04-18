@@ -85,8 +85,8 @@ SIAPPDLL_URL="$REPO_URL/files/extras/patched-dlls/siappdll.dll"
 
 check_required_packages() {
     # Extracting the Linux distribution ID and version
-    DISTRO=$(grep "^ID=" /etc/*-release | cut -d'=' -f2 | tr -d '"')
-    VERSION=$(grep "^VERSION_ID=" /etc/*-release | cut -d'=' -f2 | tr -d '"')
+    DISTRO=$(grep -d skip "^ID=" /etc/*-release | cut -d'=' -f2 | tr -d '"')
+    VERSION=$(grep -d skip "^VERSION_ID=" /etc/*-release | cut -d'=' -f2 | tr -d '"')
     DISTRO_VERSION="$DISTRO $VERSION"
     MAJOR=$(echo $VERSION | cut -d'.' -f1)
     MINOR=$(echo $VERSION | cut -d'.' -f2)
@@ -303,7 +303,7 @@ install_required_packages() {
             echo -e "$(gettext "${GREEN}All required packages for the installer are installed!")${NOCOLOR}"
             sleep 2
         else
-            echo -e "$(gettext "${RED}The installer doesn't support your current Linux distribution $distro_version at this time!")${NOCOLOR}"; 
+            echo -e "$(gettext "${RED}The installer doesn't support your current Linux distribution $DISTRO_VERSION at this time!")${NOCOLOR}"; 
             echo -e "$(gettext "${RED}The installer has been terminated!")${NOCOLOR}"
             sleep 2
             exit;
@@ -721,7 +721,12 @@ check_gpu_driver() {
         fi
     fi
 
-    if (( SECURE_BOOT && NVIDIA_PRESENT )); then
+    OLDER_NVIDIA_CARD=0
+    if lspci | grep -q "GTX 970"; then
+        OLDER_NVIDIA_CARD=1
+    fi
+
+    if (( (SECURE_BOOT && NVIDIA_PRESENT) || OLDER_NVIDIA_CARD )); then
         # If Secure Boot is enabled and the NVIDIA GPU is detected, the NVIDIA GPU should use OpenGL.
         GPU_DRIVER="OpenGL"
         GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
@@ -1480,10 +1485,10 @@ DESKTOP
 autodesk_fusion_run_install_client() {
     echo -e "$(gettext "${YELLOW}Installing Autodesk Fusion 360 Client ...${NOCOLOR}")"
     sleep 2
-    timeout -k 10m 9m "$WINE" "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_1.log"
+    timeout -k 10m 9m "$WINE" "$DOWNLOADS/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_1.log"
     sleep 5
     echo -e "$(gettext "${YELLOW}Finalizing Autodesk Fusion 360 installation...${NOCOLOR}")"
-    timeout -k 5m 1m "$WINE" "$SELECTED_DIRECTORY/downloads/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_2.log"
+    timeout -k 5m 1m "$WINE" "$DOWNLOADS/FusionClientInstaller.exe" --quiet 2>> "$SELECTED_DIRECTORY/logs/FusionClientInstaller_2.log"
     echo -e "$(gettext "${GREEN}Autodesk Fusion 360 Client installation completed!${NOCOLOR}")"
 
 }
@@ -1651,8 +1656,9 @@ wine_autodesk_fusion_install() {
     "$WINETRICKS" -q sandbox >> "$SELECTED_DIRECTORY/logs/winetricks_sandbox.log" 2>&1
 
     echo -e "$(gettext "${YELLOW}Linking the downloads folder to the Wine prefix...${NOCOLOR}")"
-    rm -rf "$WINE_PFX/drive_c/users/$USER/Downloads"
-    ln -s "$SELECTED_DIRECTORY/downloads" "$WINE_PFX/drive_c/users/$USER/Downloads"
+    DOWNLOADS="$WINE_PFX/drive_c/users/$USER/Downloads"
+    rm -rf "$DOWNLOADS"
+    ln -s "$SELECTED_DIRECTORY/downloads" "$DOWNLOADS"
 
     echo -e "$(gettext "${YELLOW}Configuring the Wine prefix for Autodesk Fusion 360...${NOCOLOR}")"
     sleep 5
@@ -1664,8 +1670,8 @@ wine_autodesk_fusion_install() {
     # Wine Mono and Gecko are auto-installed by wineboot -u above; explicit install_mono/install_gecko
     # calls via control.exe are redundant and trigger broken mscorwks WOW64 registration on Wine 11+.
 
-    # We must install some packages!
-    "$WINETRICKS" -q atmlib gdiplus corefonts cjkfonts dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet48.log"
+    # We must install some packages! (dotnet20 is needed, because of https://bugs.winehq.org/show_bug.cgi?id=41727#c5)
+    "$WINETRICKS" -q atmlib gdiplus corefonts cjkfonts dotnet20 dotnet48 msxml4 msxml6 vcrun2022 fontsmooth=rgb winhttp win10 2>> "$SELECTED_DIRECTORY/logs/winetricks_dotnet48.log"
     # We must install cjkfonts again then sometimes it doesn't work in the first time!
     echo -e "$(gettext "${YELLOW}Re-installing cjkfonts... (suppressed)${NOCOLOR}")"
     sleep 5
@@ -1695,7 +1701,7 @@ wine_autodesk_fusion_install() {
     # Download and install WebView2 to handle Login attempts, required even though we redirect to your default browser
     echo -e "$(gettext "${YELLOW}Installing Microsoft Edge WebView2 Runtime for Autodesk Fusion ...${NOCOLOR}")"
     sleep 2
-    "$WINE" "$SELECTED_DIRECTORY/downloads/WebView2installer.exe" /silent /install 2>> "$SELECTED_DIRECTORY/logs/WebView2_install.log"
+    "$WINE" "$DOWNLOADS/WebView2installer.exe" /silent /install 2>> "$SELECTED_DIRECTORY/logs/WebView2_install.log"
     echo -e "$(gettext "${GREEN}Microsoft Edge WebView2 Runtime installation completed!${NOCOLOR}")"
     # Pre-create shortcut directory for latest re-branding Microsoft Edge WebView2
     APPDATA_DIRECTORY="$WINE_PFX/drive_c/users/$USER/AppData"
@@ -1743,7 +1749,7 @@ run_install_extension_client() {
     if [[ "$EXTENSION_FILE" == *.msi ]]; then
         "$WINE" msiexec /i "$WIN_EXTENSION_DIRECTORY\\$EXTENSION_FILE" /quiet
     else
-        "$WINE" "$SELECTED_DIRECTORY/downloads/$EXTENSION_FILE"
+        "$WINE" "$DOWNLOADS/$EXTENSION_FILE"
     fi
 }
 
