@@ -22,3 +22,5 @@ Type=Application
 Categories=Education;Engineering;Graphics;Science
 StartupNotify=true
 Terminal=false
+Icon=ECF6_Fusion360.0
+StartupWMClass=fusion360.exe
