@@ -10,10 +10,6 @@
     <SSLVerifyPeerOptionId ToolTip="Ensure that the Autodesk Fusion 360 client can validate the server SSL certificate." UserName="Server-Verification" Value="TrustAllServers"/>
   </NetworkOptionGroup>
   <CompatibilityGroup SchemaVersion="2" ToolTip="Miscellaneous options which may enable Fusion to perform better on certain hardware or network configurations, and to help diagnose undesirable application behavior.">
-    <ChromiumGraphicsBackend ToolTip="Override the ANGLE backend used by embedded browser frames" UserName="Chromium Graphics Backend" Value="gl"/>
     <graphicsApiOptionId ToolTip="Controls the graphics API used to render the User Interface. This has no effect on the 3D modeling canvas." UserName="Qt Rendering Hardware Interface API" Value="OpenGL"/>
-    <LogHTTPRequestResponseBodies ToolTip="Enables logging of HTTP request and response bodies to the application log. This can generate large log files and may include sensitive information." UserName="Log HTTP Request and Response Bodies" Value="0"/>
-    <DisableTransferAccelerationId ToolTip="Disable the use of regional Content Delivery Networks for cloud data. This may fix upload/download connectivity issues on some networks." UserName="Disable data transfer acceleration" Value="1"/>
-    <OverrideChromiumGPUWorkarounds ToolTip="Disable Chromium's default graphics workarounds for various GPU driver bugs in embedded browser frames." UserName="Override Chromium GPU Workarounds" Value="1"/>
-    </CompatibilityGroup>
+  </CompatibilityGroup>
 </OptionGroups>
