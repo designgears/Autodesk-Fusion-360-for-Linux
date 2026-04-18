@@ -27,7 +27,7 @@
 
 ---
 
-## What is Autodesk Fusion 360?</h2>
+## What is Autodesk Fusion 360?
 
 <a href="https://www.autodesk.com/products/fusion-360/features">Autodesk Fusion 360</a> is a powerful, cloud-based platform that integrates 3D modeling, CAD, CAM, CAE, and PCB design in a single solution. However, for Linux users, accessing this application can be a challenge, as it was primarily designed for Windows and macOS.
 
@@ -292,7 +292,15 @@ And would you like to use <a href="https://apps.autodesk.com/FUSION/de/Home/Inde
 - Check, if your system meets all requirements</a>!
 - You need an active Fusion 360 license</a>!
 
-#### Open a terminal and run this command to install the basic Autodesk Fusion:
+#### Open a terminal and run this command to install Autodesk Fusion with the Wine Z-window fix runtime:
+
+```
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install-fix --default
+```
+
+The installer checks first if the local `fusion-wine-build` runtime is already available. If it is missing, it downloads the pre-built runtime from GitHub releases.
+
+#### Open a terminal and run this command to install Autodesk Fusion with system Wine:
  
 ```
 curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install --default
@@ -313,6 +321,28 @@ Use the `--proton=<version>` flag to specify the Proton version, for example:
 ```
 curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --proton=GE-Proton10-32 --default
 ```
+
+For the Z-window fix with Proton, use this command:
+
+```
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --proton=GE-Proton10-Fusion --default
+```
+
+The installer checks first if `GE-Proton10-Fusion` is installed locally in Steam compatibility tools. If it is missing, it downloads the pre-built runtime from GitHub releases.
+
+#### Build the fix runtimes yourself (optional)
+
+If you prefer building locally instead of using pre-built archives:
+
+```
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --build wine-fix
+```
+
+```
+curl -L https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --build proton-fix
+```
+
+Note: Pre-built archives are currently hosted on GitHub releases because Codeberg release uploads for this workflow exceed the file size limit.
 
 #### Open a terminal and run this command to uninstall:
 
