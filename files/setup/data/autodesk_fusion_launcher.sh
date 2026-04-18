@@ -7,8 +7,8 @@
 # Author URI:   https://cryinkfly.com                                       #
 # License:      MIT                                                         #
 # Copyright (c) 2020-2026                                                   #
-# Time/Date:    09:17/26.02.2026       (edited by WakinCode on 25.03.2026)  #
-# Version:      2.1.1-Alpha                                                 #
+# Time/Date:    09:17/26.02.2026                                            #
+# Version:      2.1.4-Alpha                                                 #
 #############################################################################
 
 # Path: SELECTED__INSTALLATION_PATH/bin/autodesk_fusion_launcher.sh
@@ -39,14 +39,6 @@ WINE_PFX=$(awk 'NR == 3' "$WINEPREFIX_LOG_FILE")
 PROTON_VERSION=$(awk 'NR == 4' "$WINEPREFIX_LOG_FILE")
 
 REPO_URL="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main"
-
-if [ -x "$AUTODESK_ROOT_DIRECTORY/wine-build/bin/wine" ]; then
-        WINE="$AUTODESK_ROOT_DIRECTORY/wine-build/bin/wine"
-        WINESERVER="$AUTODESK_ROOT_DIRECTORY/wine-build/bin/wineserver"
-else
-    WINE="wine"
-    WINESERVER="wineserver"
-fi
 
 # This feature will check if there is a new version of Autodesk Fusion 360.
 function check_autodesk_fusion_online_versions() {
@@ -99,14 +91,16 @@ function update() {
     curl -L "$fusion360_installer_url" -o $AUTODESK_FUSION_INSTALLER
     cp "$AUTODESK_ROOT_DIRECTORY/downloads/Fusion360ClientInstaller.exe" "$SELECTED_DIRECTORY/wineprefixes/default/drive_c/users/$USER/Downloads"
     # Install the newest version of the Autodesk Fusion 360
-    WINEPREFIX="$WINE_PFX" timeout -k 2m 1m "$WINE" "$WINE_PFX/drive_c/users/$USER/Downloads/Fusion360installer.exe" --quiet
-    WINEPREFIX="$WINE_PFX" timeout -k 2m 1m "$WINE" "$WINE_PFX/drive_c/users/$USER/Downloads/Fusion360installer.exe" --quiet
+    WINEPREFIX="$WINE_PFX" timeout -k 2m 1m wine "$WINE_PFX/drive_c/users/$USER/Downloads/Fusion360installer.exe" --quiet
+    WINEPREFIX="$WINE_PFX" timeout -k 2m 1m wine "$WINE_PFX/drive_c/users/$USER/Downloads/Fusion360installer.exe" --quiet
     run_autodesk_fusion
 }
 
 function run_autodesk_fusion() {
     if [ "$PROTON_VERSION" == "Wine" ]; then
         run_autodesk_fusion_wine
+    elif [ "$PROTON_VERSION" == "Wine-fix" ]; then
+        run_autodesk_fusion_wine_fix
     else
         run_autodesk_fusion_proton
     fi
@@ -119,7 +113,7 @@ function run_autodesk_fusion_wine() {
 
     WINEPREFIX="$WINE_PFX" \
     WINEDEBUG=-all \
-    "$WINE" "$LAUNCHER" &
+    wine "$LAUNCHER" &
 
     # WINEDEBUG=-all = Logs everything, probably gives too much information in most cases, but may come in handy for subtle issues
     # WINEDEBUG=-d3d = Will turn off all d3d messages, and additionally disable checking for GL errors after operations. This may improve performance.
@@ -127,7 +121,28 @@ function run_autodesk_fusion_wine() {
     WINEPID=$!
     wait "$WINEPID"
 
-    WINEPREFIX="$WINE_PFX" "$WINESERVER" -k
+    WINEPREFIX="$WINE_PFX" wineserver -k
+}
+
+function run_autodesk_fusion_wine_fix() {
+    LAUNCHER="$(find "$WINE_PFX" -name Fusion360.exe -printf "%T+ %p\n" | sort -r 2>&1 | head -n 1 | cut -d' ' -f2-)"
+
+    WINE_BUILD_DIR="$HOME/fusion-wine-build/bin"
+
+    echo $LAUNCHER
+
+    WINEPREFIX="$WINE_PFX" \
+    WINESERVER="$WINE_BUILD_DIR/wineserver" \
+    WINEDEBUG=-all \
+    $WINE_BUILD_DIR/wine "$LAUNCHER" &
+
+    # WINEDEBUG=-all = Logs everything, probably gives too much information in most cases, but may come in handy for subtle issues
+    # WINEDEBUG=-d3d = Will turn off all d3d messages, and additionally disable checking for GL errors after operations. This may improve performance.
+
+    WINEPID=$!
+    wait "$WINEPID"
+
+    WINEPREFIX="$WINE_PFX" "$WINE_BUILD_DIR/wineserver" -k
 }
 
 function run_autodesk_fusion_proton() {
