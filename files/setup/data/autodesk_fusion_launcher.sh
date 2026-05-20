@@ -7,8 +7,8 @@
 # Author URI:   https://cryinkfly.com                                       #
 # License:      MIT                                                         #
 # Copyright (c) 2020-2026                                                   #
-# Time/Date:    09:17/26.02.2026                                            #
-# Version:      2.1.4-Alpha                                                 #
+# Time/Date:    18:57/20.05.2026                                            #
+# Version:      2.1.5-Alpha                                                 #
 #############################################################################
 
 # Path: SELECTED__INSTALLATION_PATH/bin/autodesk_fusion_launcher.sh
@@ -42,7 +42,7 @@ REPO_URL="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch
 
 # This feature will check if there is a new version of Autodesk Fusion 360.
 function check_autodesk_fusion_online_versions() {
-    curl -o "$AUTODESK_ROOT_DIRECTORY/logs/version.txt" -L "$REPO_URL/files/builds/stable-branch/bin/build-version.txt"
+    curl -o "$AUTODESK_ROOT_DIRECTORY/logs/version.txt" -L "$REPO_URL/files/setup/data/build-versions.txt"
     ONLINE_BUILD_VERSION=$(awk 'NR == 1' "$AUTODESK_ROOT_DIRECTORY/logs/version.txt")
     ONLINE_INSIDER_BUILD_VERSION=$(awk 'NR == 2' "$AUTODESK_ROOT_DIRECTORY/logs/version.txt")
     echo "Online Build-Version: $ONLINE_BUILD_VERSION"
