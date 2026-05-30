@@ -475,4 +475,4 @@ Wenn dir meine Arbeit gefällt und du mich bei der Erstellung weiterer Tutorials
 
 **Unterstütze meine Arbeit, bringe Ideen ein und hilf der Community beim Wachstum!**
 
-[![Sponsor werden oder Unterstützer](https://img.shields.io/badge/Become%20a%20Sponsor%20or%20Supporter-%23E34C4C?style=for-the-badge&logoColor=white)](https://cryinkfly.com/become-partner/)
+[![Sponsor werden oder Unterstützer](https://img.shields.io/badge/Become%20a%20Sponsor%20or%20Supporter-%23E34C4C?style=for-the-badge&logoColor=white)](https://cryinkfly.de/unterstuetzen/)
