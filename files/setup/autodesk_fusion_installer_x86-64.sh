@@ -828,9 +828,26 @@ check_gpu_driver() {
 
     if (( (SECURE_BOOT && NVIDIA_PRESENT) || OLDER_NVIDIA_GPU )); then
         # If Secure Boot is enabled and the NVIDIA GPU is detected, the NVIDIA GPU should use OpenGL.
-        GPU_DRIVER="OpenGL"
-        GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
-        echo -e "$(gettext "${GREEN}Secure Boot is enabled. The OpenGL GPU driver is being used for the NVIDIA GPU.${NOCOLOR}")"
+        echo -e "$(gettext "${YELLOW}Secure Boot is enabled. Please select which GPU driver to use:${NOCOLOR}")"
+        echo "1) DXVK (Warning: May have issues on Nvidia when Secure Boot is enabled)"
+        echo "2) OpenGL"
+        read -p "Enter your choice (1 or 2): " driver_choice
+        case $driver_choice in
+            1)
+                GPU_DRIVER="DXVK"
+                # This will fail, check later if we have Secure Boot enabled and Nvidia present. I left it here in case the driver behaviour changes.
+                GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
+                echo -e "$(gettext "${GREEN}The DXVK GPU driver will be used for installation.${NOCOLOR}")"
+                ;;
+            2)
+                GPU_DRIVER="OpenGL"
+                GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
+                echo -e "$(gettext "${GREEN}The OpenGL GPU fallback driver is used for the installation.${NOCOLOR}")"
+                ;;
+            *)
+                GPU_DRIVER="OpenGL"
+                GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
+        esac
     else 
         echo -e "$(gettext "${GREEN}Secure Boot is disabled. Checking available GPU drivers...${NOCOLOR}")"
         # If Secure Boot is disabled, handle GPU selection
@@ -923,7 +940,11 @@ check_gpu_vram() {
 
     if [ -z "$GET_VRAM_MEGABYTES" ]; then
         echo -e "$(gettext "${RED}Could not determine VRAM size.${NOCOLOR}")"
-        exit 1
+        # If an Nvidia GPU is present and Secure Boot is enabled, a fail here is expected. Check for both and continue if true
+        if ((SECURE_BOOT && NVIDIA_PRESENT)); then
+            exit 0
+        else
+            exit 1
     fi
     
     # Check if the total memory is greater than 1000 Megabytes
