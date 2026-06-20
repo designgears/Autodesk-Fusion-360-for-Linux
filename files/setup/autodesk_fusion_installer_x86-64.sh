@@ -7,8 +7,8 @@
 # Author URI:   https://cryinkfly.com                                                              #
 # License:      MIT                                                                                #
 # Copyright (c) 2020-2026                                                                          #
-# Time/Date:    11:22/15.03.2026                                                                   #
-# Version:      2.1.4-Alpha                                                                        #
+# Time/Date:    11:45/01.06.2026                                                                   #
+# Version:      2.1.5-Alpha                                                                        #
 ####################################################################################################
 
 ###############################################################################################################################################################
@@ -27,7 +27,18 @@ SELECTED_DIRECTORY="$2"
 SELECTED_EXTENSIONS="$3"
 DOWNLOAD_EXTENSIONS=0
 PROTON_VERSION=""
-STEAM_DIRECTORY="$HOME/.local/share/Steam"
+# Detect the Steam installation directory
+STEAM_DIRECTORY=""
+for STEAM_CANDIDATE in \
+    "$HOME/.local/share/Steam" \
+    "$HOME/.steam/steam" \
+    "$HOME/.steam/root" \
+    "$HOME/.steam/debian-installation"; do
+    if [ -d "$STEAM_CANDIDATE" ]; then
+        STEAM_DIRECTORY="$STEAM_CANDIDATE"
+        break
+    fi
+done
 STEAM_COMPAT_DIR="$STEAM_DIRECTORY/compatibilitytools.d"
 DESKTOP_DIRECTORY="$HOME/.local/share/applications"
 FUSION_DESKTOP_DIRECTORY="$DESKTOP_DIRECTORY/wine/Programs/Autodesk"
@@ -36,6 +47,15 @@ WINE_BUILD_DIR="$HOME/fusion-wine-build"
 if [ "$SELECTED_DIRECTORY" == "--default" ]; then
     SELECTED_DIRECTORY="$HOME/.autodesk_fusion"
 fi
+
+case "$SELECTED_OPTION" in
+    --install|--install-fix|--proton=*)
+        if [[ "$SELECTED_DIRECTORY" != /*/* ]] || [ "${SELECTED_DIRECTORY%/}" == "${HOME%/}" ]; then
+            echo -e "$(gettext "${RED}Invalid installation directory '$SELECTED_DIRECTORY'! Please provide a valid absolute path inside your home directory, e.g. $HOME/.autodesk_fusion${NOCOLOR}")"
+            exit 1
+        fi
+        ;;
+esac
 
 # if selected_extensions is set to --full, then all extensions will be installed
 if [ "$SELECTED_EXTENSIONS" == "--full" ]; then
@@ -68,17 +88,11 @@ WINETRICKS_URL="https://raw.githubusercontent.com/Winetricks/winetricks/master/s
 
 # URL to download Fusion360Installer.exe files
 AUTODESK_FUSION_INSTALLER_URL="https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Admin%20Install.exe"
-#AUTODESK_FUSION_INSTALLER_URL="https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Client%20Downloader.exe"
-#AUTODESK_FUSION_INSTALLER_URL="https://dl.appstreaming.autodesk.com/production/installers/Fusion%20360%20Admin%20Install.exe" <-- Old Link!!!
+#AUTODESK_FUSION_INSTALLER_URL="https://github.com/Lolig4/Autodesk-Fusion-360-for-Linux/releases/download/Fusion_24.03.2026/Fusion_24.03.2026.tar.gz"
 
-# URL to download Microsoft Edge WebView2.Exec
-WEBVIEW2_INSTALLER_URL="https://github.com/aedancullen/webview2-evergreen-standalone-installer-archive/releases/download/109.0.1518.78/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
-# Testing a newer version (144.0.3719.93): WEBVIEW2_INSTALLER_URL="https://msedge.sf.dl.delivery.mp.microsoft.com/filestreamingservice/files/ba1bb4b1-79ea-47b5-a0e0-967253cd7900/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
-# For a static link to the latest version
-# WEBVIEW2_INSTALLER_URL="https://go.microsoft.com/fwlink/p/?LinkId=2124703"
-
-# URL to download the patched Qt6WebEngineCore.dll file
-QT6_WEBENGINECORE_URL="$REPO_URL/files/extras/patched-dlls/Qt6WebEngineCore-06-2025.7z"
+# URL to download MicrosoftEdgeWebView2RuntimeInstallerX64.exe
+WEBVIEW2_INSTALLER_URL="https://go.microsoft.com/fwlink/?linkid=2124701"
+#WEBVIEW2_INSTALLER_URL="https://github.com/aedancullen/webview2-evergreen-standalone-installer-archive/releases/download/109.0.1518.78/MicrosoftEdgeWebView2RuntimeInstallerX64.exe"
 
 # URL to download the patched siappdll.dll file
 SIAPPDLL_URL="$REPO_URL/files/extras/patched-dlls/siappdll.dll"
@@ -97,9 +111,9 @@ check_required_packages() {
 
     # Example required commands, now including "xrandr" and "bc"
     if [[ $DISTRO_VERSION == *"arch"* ]] || [[ $DISTRO_VERSION == *"manjaro"* ]] || [[ $DISTRO_VERSION == *"endeavouros"* ]] || [[ $DISTRO_VERSION == *"cachyos"* ]]; then
-        REQUIRED_COMMANDS=("curl" "lsb_release" "glxinfo" "pkexec" "wget" "ls" "cat" "echo" "awk" "7z" "cabextract" "samba" "wbinfo" "systemctl" "bc" "xrandr" "mokutil" "xdg-open" "xdg-mime" "update-desktop-database" "qtpaths")
+        REQUIRED_COMMANDS=("curl" "lsb_release" "glxinfo" "pkexec" "wget" "awk" "7z" "cabextract" "wbinfo" "systemctl" "bc" "xrandr" "mokutil" "xdg-open" "xdg-mime" "update-desktop-database" "qtpaths")
     else
-        REQUIRED_COMMANDS=("curl" "lsb_release" "glxinfo" "pkexec" "wget" "ls" "cat" "echo" "awk" "7z" "cabextract" "samba" "wbinfo" "systemctl" "bc" "xrandr" "mokutil" "xdg-open" "xdg-mime" "update-desktop-database")
+        REQUIRED_COMMANDS=("curl" "lsb_release" "glxinfo" "pkexec" "wget" "awk" "7z" "cabextract" "wbinfo" "systemctl" "bc" "xrandr" "mokutil" "xdg-open" "xdg-mime" "update-desktop-database")
     fi
 
     # Additional requirements for building patched Wine/Proton.
@@ -125,14 +139,6 @@ check_required_packages() {
                     ;;
                 cabextract)
                     if ! cabextract --version &>/dev/null; then
-                        echo -e "${RED}The required command (${cmd}) is not available!${NOCOLOR}"
-                        MISSING_COMMANDS+=("$cmd")
-                    else
-                        echo -e "${GREEN}The required command (${cmd}) is available!${NOCOLOR}"
-                    fi
-                    ;;
-                samba)
-                    if ! samba --version &>/dev/null; then
                         echo -e "${RED}The required command (${cmd}) is not available!${NOCOLOR}"
                         MISSING_COMMANDS+=("$cmd")
                     else
@@ -330,9 +336,14 @@ install_required_packages() {
     elif [[ $DISTRO_VERSION == *"gentoo"* ]]; then
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
-        sudo emerge -q app-admin/samba app-misc/spacenavd app-arch/cabextract app-arch/p7zip net-misc/curl net-misc/wget sys-apps/coreutils sys-apps/gawk sys-apps/lsb-release sys-auth/polkit x11-apps/mesa-progs x11-misc/xdg-utils sys-apps/bc x11-apps/xrandr dev-util/desktop-file-utils
-        sudo rc-update add spacenavd default
-        sudo /etc/init.d/spacenavd start
+        sudo emerge -q net-fs/samba app-misc/spacenavd app-arch/cabextract app-arch/p7zip net-misc/curl net-misc/wget sys-apps/coreutils sys-apps/gawk sys-apps/lsb-release sys-auth/polkit x11-apps/mesa-progs x11-misc/xdg-utils sys-apps/bc x11-apps/xrandr dev-util/desktop-file-utils
+        # Enable the optional spacenavd service depending on the init system (Gentoo supports both systemd and OpenRC)
+        if command -v systemctl &> /dev/null; then
+            sudo systemctl enable --now spacenavd
+        elif command -v rc-update &> /dev/null; then
+            sudo rc-update add spacenavd default
+            sudo /etc/init.d/spacenavd start
+        fi
         echo -e "$(gettext "${GREEN}All required packages for the installer are installed!")${NOCOLOR}"
         sleep 2
     elif [[ $DISTRO_VERSION == *"nixos"* ]]; then
@@ -551,9 +562,9 @@ check_option() {
                 exit 1
             fi
 
-            read -p "$(gettext "${GREEN}Do you really want to uninstall Autodesk Fusion from $SELECTED_DIRECTORY?${NOCOLOR}") [y/n] " yn
+            read -p "$(gettext "${GREEN}Do you really want to uninstall Autodesk Fusion from $SELECTED_DIRECTORY?${NOCOLOR}") [y/N] " yn
             case $yn in
-                [Yy]*) echo "$(gettext "${YELLOW}1. Uninstall Autodesk Fusion with all Wineprefixes and components${NOCOLOR}")"
+                [Yy]) echo "$(gettext "${YELLOW}1. Uninstall Autodesk Fusion with all Wineprefixes and components${NOCOLOR}")"
                         echo "$(gettext "${YELLOW}2. Uninstall only a specific Wineprefix of Autodesk Fusion${NOCOLOR}")"
                         read -p "$(gettext "${GREEN}Please select an option: ${NOCOLOR}")" uninstall_option
 
@@ -600,12 +611,10 @@ check_option() {
                             *) echo "$(gettext "${RED}Please select a valid option!${NOCOLOR}")"
                                 exit 1;;
                         esac;;  
-                [Nn]*) echo -e "$(gettext "${GREEN}The uninstallation process has been canceled!")${NOCOLOR}"
-                        exit 0;;
-                *) echo -e "$(gettext "${YELLOW}Please answer with yes or no!${NOCOLOR}")"
-                    exit 1;;
-            esac
-            ;;
+                *) echo -e "$(gettext "${GREEN}The uninstallation process has been canceled!")${NOCOLOR}"
+                    exit 0;;
+            esac;;
+
         --install|--install-fix|--proton=*)
             echo -e "$(gettext "${GREEN}Starting the installation process ...${NOCOLOR}")"
             sleep 1
@@ -647,16 +656,16 @@ check_option() {
             check_and_install_wine
             wine_autodesk_fusion_install
             DeviceSettingsProvider_fix
-            autodesk_fusion_patch_qt6webenginecore
             autodesk_fusion_patch_siappdll
             wine_autodesk_fusion_install_extensions
             autodesk_fusion_shortcuts_load
             autodesk_fusion_safe_logfile
             reset_window_not_responding_dialog
-            xdg-open "https://cryinkfly.com/become-partner/"
+            xdg-open "https://cryinkfly.com/contributors/"
             run_wine_autodesk_fusion
             exit 0;;
         --build)
+            check_and_install_wine
             case "$SELECTED_DIRECTORY" in
                 wine-fix)
                 build_patched_wine
@@ -692,6 +701,7 @@ deactivate_window_not_responding_dialog() {
 ##############################################################################################################################################################################
 
 create_data_structure() {
+    rm -rf "$WINE_PFX"
     mkdir -p "$SELECTED_DIRECTORY/bin" \
         "$SELECTED_DIRECTORY/downloads/extensions" \
         "$SELECTED_DIRECTORY/logs" \
@@ -737,20 +747,14 @@ check_ram() {
     else
         CONVERT_RAM_GIGABYTES=$(awk "BEGIN {printf \"%.2f\", $GET_RAM_KILOBYTES / 1024 / 1024}")
         echo -e "$(gettext "${RED}The total RAM (Random Access Memory) is not greater than 4 GByte ($CONVERT_RAM_GIGABYTES GByte) and Autodesk Fusion may run unstable later with insufficient RAM memory!${NOCOLOR}")"
-        read -p "$(gettext "${YELLOW}Are you sure you want to continue with the installation? (y/n)${NOCOLOR}")" INSTALL_CONFIRM_CHOICE
+        read -p "$(gettext "${YELLOW}Are you sure you want to continue with the installation? [y/N]${NOCOLOR}")" INSTALL_CONFIRM_CHOICE
         case "$INSTALL_CONFIRM_CHOICE" in 
             [Yy]) 
                 echo -e "$(gettext "${YELLOW}Continuing with the installation...${NOCOLOR}")"
                 ;;
-            [Nn]) 
-                echo -e "$(gettext "${RED}The installer has been terminated!${NOCOLOR}")"
-                exit 0
-                ;;
             *) 
-                echo -e "$(gettext "${RED}Invalid input! The installer was terminated.${NOCOLOR}")"
-                rm -rf "$SELECTED_DIRECTORY"
-                exit 1
-                ;;
+                echo -e "$(gettext "${RED}The installer has been terminated!${NOCOLOR}")"
+                exit 0;;
         esac
     fi
 }
@@ -828,26 +832,9 @@ check_gpu_driver() {
 
     if (( (SECURE_BOOT && NVIDIA_PRESENT) || OLDER_NVIDIA_GPU )); then
         # If Secure Boot is enabled and the NVIDIA GPU is detected, the NVIDIA GPU should use OpenGL.
-        echo -e "$(gettext "${YELLOW}Secure Boot is enabled. Please select which GPU driver to use:${NOCOLOR}")"
-        echo "1) DXVK (Warning: May have issues on Nvidia when Secure Boot is enabled)"
-        echo "2) OpenGL"
-        read -p "Enter your choice (1 or 2): " driver_choice
-        case $driver_choice in
-            1)
-                GPU_DRIVER="DXVK"
-                # This will fail, check later if we have Secure Boot enabled and Nvidia present. I left it here in case the driver behaviour changes.
-                GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
-                echo -e "$(gettext "${GREEN}The DXVK GPU driver will be used for installation.${NOCOLOR}")"
-                ;;
-            2)
-                GPU_DRIVER="OpenGL"
-                GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
-                echo -e "$(gettext "${GREEN}The OpenGL GPU fallback driver is used for the installation.${NOCOLOR}")"
-                ;;
-            *)
-                GPU_DRIVER="OpenGL"
-                GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
-        esac
+        GPU_DRIVER="OpenGL"
+        GET_VRAM_MEGABYTES="$NVIDIA_VRAM"
+        echo -e "$(gettext "${GREEN}Secure Boot is enabled. The OpenGL GPU driver is being used for the NVIDIA GPU.${NOCOLOR}")"
     else 
         echo -e "$(gettext "${GREEN}Secure Boot is disabled. Checking available GPU drivers...${NOCOLOR}")"
         # If Secure Boot is disabled, handle GPU selection
@@ -940,12 +927,7 @@ check_gpu_vram() {
 
     if [ -z "$GET_VRAM_MEGABYTES" ]; then
         echo -e "$(gettext "${RED}Could not determine VRAM size.${NOCOLOR}")"
-        # If an Nvidia GPU is present and Secure Boot is enabled, a fail here is expected. Check for both and continue if true
-        if ((SECURE_BOOT && NVIDIA_PRESENT)); then
-            return 0
-        else
-            exit 1
-        fi
+        exit 1
     fi
     
     # Check if the total memory is greater than 1000 Megabytes
@@ -955,14 +937,12 @@ check_gpu_vram() {
     else
         CONVERT_RAM_GIGABYTES=$(awk "BEGIN {printf \"%.2f\", $GET_VRAM_MEGABYTES / 1000}")
         echo -e "$(gettext "${RED}The total VRAM (Video RAM) is not greater than 1 GByte (${CONVERT_RAM_GIGABYTES} GByte) and Autodesk Fusion may run unstable later with insufficient VRAM memory!${NOCOLOR}")"
-        read -p "$(gettext "${YELLOW}Are you sure you want to continue with the installation? (y/n)${NOCOLOR}")" VRAM_CONFIRM_CHOICE
-        case "$VRAM_CONFIRM_CHOICE" in 
-            [Yy]) echo -e "$(gettext "${GREEN}Continuing with the installation...${NOCOLOR}")";;
-            [Nn]) echo -e "$(gettext "${RED}The installer has been terminated!${NOCOLOR}")"
+        read -p "$(gettext "${YELLOW}Are you sure you want to continue with the installation? [y/N]${NOCOLOR}")" VRAM_CONFIRM_CHOICE
+        case "$VRAM_CONFIRM_CHOICE" in
+            [Yy]) echo -e "$(gettext "${GREEN}Continuing with the installation...${NOCOLOR}")"
+                ;;
+            *) echo -e "$(gettext "${RED}The installer has been terminated!${NOCOLOR}")"
                 exit 0;;
-            *) echo -e "$(gettext "${RED}Invalid input. The installer has been terminated!${NOCOLOR}")"
-                rm -rf "$SELECTED_DIRECTORY"
-                exit 1;;
         esac
     fi
 }
@@ -1091,18 +1071,18 @@ Pin-Priority: 1000
     fi
 }
 
-PATCH_FILE="/tmp/wine-captionless-popups.patch"
-PATCH_URL="$REPO_URL/files/setup/data/wine-captionless-popups.patch"
+PATCH_POPUPS_FILE="/tmp/wine-captionless-popups.patch"
+PATCH_POPUPS_URL="$REPO_URL/files/setup/data/wine-captionless-popups.patch"
 build_patched_wine() {
     WINE_SOURCE_DIR="$HOME/fusion-wine-source"
 
     rm -rf "$WINE_BUILD_DIR"
-    rm -f "$PATCH_FILE"
+    rm -f "$PATCH_POPUPS_FILE" "$PATCH_PIPE_FILE"
     echo -e "${YELLOW}Building patched Wine for Fusion 360 window fix (this will take 15-30 minutes)...${NOCOLOR}"
 
-    # Download patch
-    echo -e "${YELLOW}Downloading Wine patch...${NOCOLOR}"
-    curl -L "$PATCH_URL" -o "$PATCH_FILE" || {
+    # Download patches
+    echo -e "${YELLOW}Downloading Wine patches...${NOCOLOR}"
+    curl -L "$PATCH_POPUPS_URL" -o "$PATCH_POPUPS_FILE" || {
         echo -e "${RED}Failed to download Wine patch. Skipping patched build.${NOCOLOR}"
         exit 1
     }
@@ -1119,15 +1099,15 @@ build_patched_wine() {
         }
     fi
 
-    # Apply patch
+    # Apply patches
     echo -e "${YELLOW}Applying captionless popup patch...${NOCOLOR}"
     cd "$WINE_SOURCE_DIR"
-    if patch -p1 --dry-run < "$PATCH_FILE" >/dev/null 2>&1; then
-        patch -p1 < "$PATCH_FILE" || {
+    if patch -p1 --dry-run < "$PATCH_POPUPS_FILE" >/dev/null 2>&1; then
+        patch -p1 < "$PATCH_POPUPS_FILE" || {
             echo -e "${RED}Patch failed to apply. Skipping patched build.${NOCOLOR}"
             exit 1
         }
-    elif patch -R -p1 --dry-run < "$PATCH_FILE" >/dev/null 2>&1; then
+    elif patch -R -p1 --dry-run < "$PATCH_POPUPS_FILE" >/dev/null 2>&1; then
         echo -e "${YELLOW}Patch already applied. Skipping patch step.${NOCOLOR}"
     else
         echo -e "${RED}Patch does not match this source tree!${NOCOLOR}"
@@ -1159,15 +1139,15 @@ build_patched_wine() {
     echo -e "${GREEN}Patched Wine build complete!${NOCOLOR}"
 }
 
-PROTON_BUILD_NAME="GE-Proton10-Fusion"
+PROTON_BUILD_NAME="GE-Proton11-Fusion"
 build_patched_proton() {
     PROTON_BUILD_DIR="$HOME/fusion-proton-build"
     PROTON_SOURCE_DIR="$HOME/fusion-proton-source"
     echo -e "${YELLOW}Building patched Proton for Fusion 360 window fix (this will take 15-120 minutes)...${NOCOLOR}"
 
-    # Download patch
-    echo -e "${YELLOW}Downloading Proton patch...${NOCOLOR}"
-    curl -L "$PATCH_URL" -o "$PATCH_FILE" || {
+    # Download patches
+    echo -e "${YELLOW}Downloading Proton patches...${NOCOLOR}"
+    curl -L "$PATCH_POPUPS_URL" -o "$PATCH_POPUPS_FILE" || {
         echo -e "${RED}Failed to download Proton patch. Skipping patched build.${NOCOLOR}"
         exit 1
     }
@@ -1184,17 +1164,17 @@ build_patched_proton() {
         }
     fi
 
-    # Apply patch
+    # Apply patches
     echo -e "${YELLOW}Applying captionless popup patch...${NOCOLOR}"
     cd "$PROTON_SOURCE_DIR"
     ./patches/protonprep-valve-staging.sh
     cd "$PROTON_SOURCE_DIR/wine"
-    if patch -p1 --dry-run < "$PATCH_FILE" >/dev/null 2>&1; then
-        patch -p1 < "$PATCH_FILE" || {
+    if patch -p1 --dry-run < "$PATCH_POPUPS_FILE" >/dev/null 2>&1; then
+        patch -p1 < "$PATCH_POPUPS_FILE" || {
             echo -e "${RED}Patch failed to apply. Skipping patched build.${NOCOLOR}"
             exit 1
         }
-    elif patch -R -p1 --dry-run < "$PATCH_FILE" >/dev/null 2>&1; then
+    elif patch -R -p1 --dry-run < "$PATCH_POPUPS_FILE" >/dev/null 2>&1; then
         echo -e "${YELLOW}Patch already applied. Skipping patch step.${NOCOLOR}"
     else
         echo -e "${RED}Patch does not match this source tree!${NOCOLOR}"
@@ -1258,54 +1238,46 @@ download_files() {
     sleep 2
 
     if [[ ! -x "$WINE_BUILD_DIR/bin/wine" && "$SELECTED_OPTION" == "--install-fix" ]]; then
-        download_file "fusion-wine-build.tar.gz" "https://github.com/Lolig4/Autodesk-Fusion-360-for-Linux/releases/download/Pre_Build_Wine%2FProton/fusion-wine-build.tar.gz"
+        download_file "fusion-wine-build.tar.gz" "https://github.com/Lolig4/Autodesk-Fusion-360-for-Linux/releases/download/Pre_Build_Wine%2FProton_01.06.26/fusion-wine-build.tar.gz"
         rm -rf "$WINE_BUILD_DIR"
         echo -e "$(gettext "${YELLOW}Extracting Custom Fusion Wine Build...${NOCOLOR}")"
         tar -xf "$SELECTED_DIRECTORY/downloads/fusion-wine-build.tar.gz" -C "$HOME"
     fi
     if [[ ! -x "$PROTON_DIRECTORY/proton" &&"$SELECTED_OPTION" == "--proton" && "$PROTON_VERSION" == "$PROTON_BUILD_NAME" ]]; then
-        download_file "$PROTON_BUILD_NAME.tar.gz" "https://github.com/Lolig4/Autodesk-Fusion-360-for-Linux/releases/download/Pre_Build_Wine%2FProton/GE-Proton10-Fusion.tar.gz"
+        download_file "$PROTON_BUILD_NAME.tar.gz" "https://github.com/Lolig4/Autodesk-Fusion-360-for-Linux/releases/download/Pre_Build_Wine%2FProton_01.06.26/$PROTON_BUILD_NAME.tar.gz"
         rm -rf "$PROTON_DIRECTORY"
         echo -e "$(gettext "${YELLOW}Extracting Custom Proton Build...${NOCOLOR}")"
         tar -xf "$SELECTED_DIRECTORY/downloads/$PROTON_BUILD_NAME.tar.gz" -C "$STEAM_COMPAT_DIR"
     fi
 
-    # Download the newest winetricks version:
     download_file "winetricks" "$WINETRICKS_URL" "$SELECTED_DIRECTORY/bin"
     chmod +x "$SELECTED_DIRECTORY/bin/winetricks"
 
-    # Search for an existing installer of Autodesk Fusion and download it if it doesn't exist or is older than 7 days
+    #download_file "Fusion_24.03.2026.tar.gz" "$AUTODESK_FUSION_INSTALLER_URL"
+    #tar -xf "$SELECTED_DIRECTORY/downloads/Fusion_24.03.2026.tar.gz" -C "$SELECTED_DIRECTORY/downloads"
     download_file "FusionClientInstaller.exe" "$AUTODESK_FUSION_INSTALLER_URL"
 
-    # Search for an existing installer of WEBVIEW2 and download it if it doesn't exist or is older than 7 days
-    download_file "WebView2installer.exe" "$WEBVIEW2_INSTALLER_URL"
+    download_file "MicrosoftEdgeWebView2RuntimeInstallerX64.exe" "$WEBVIEW2_INSTALLER_URL"
  
-    # Download all tested extensions for Autodesk Fusion 360 on Linux
     if (( DOWNLOAD_EXTENSIONS )); then
         download_extensions_files
     fi
 
-    # Download the patched Qt6WebEngineCore.dll file
-    download_file "Qt6WebEngineCore.dll.7z" "$QT6_WEBENGINECORE_URL"
-
-    # Download the patched siappdll.dll file
     download_file "siappdll.dll" "$SIAPPDLL_URL"
 
     mkdir -p "$SELECTED_DIRECTORY/downloads/$GPU_DRIVER"
-    # Download the DXVK registry file if the DXVK GPU driver is selected
+
     if [[ $GPU_DRIVER == "DXVK" ]]; then
         download_file "DXVK.reg" "$REPO_URL/files/setup/resource/video_driver/DXVK/DXVK.reg" "$SELECTED_DIRECTORY/downloads/DXVK"
     fi
     download_file "NMachineSpecificOptions.xml" "$REPO_URL/files/setup/resource/video_driver/$GPU_DRIVER/NMachineSpecificOptions.xml" "$SELECTED_DIRECTORY/downloads/$GPU_DRIVER"
 
-    # Download Autodesk Fusion SVG!
     download_file "autodesk_fusion.svg" "$REPO_URL/files/setup/resource/graphics/autodesk_fusion.svg" "$SELECTED_DIRECTORY/resources/graphics"
     download_file "Autodesk Fusion.desktop" "$REPO_URL/files/setup/resource/.desktop/Autodesk%20Fusion.desktop" "$SELECTED_DIRECTORY/.desktop"
     download_file "adskidmgr-opener.desktop" "$REPO_URL/files/setup/resource/.desktop/adskidmgr-opener.desktop" "$SELECTED_DIRECTORY/.desktop"
     download_file "swap_desktop_files.sh" "$REPO_URL/files/setup/data/swap_desktop_files.sh" "$SELECTED_DIRECTORY/bin"
     chmod +x "$SELECTED_DIRECTORY/bin/swap_desktop_files.sh"
 
-    # Download some script files for Autodesk Fusion 360!
     download_file "autodesk_fusion_launcher.sh" "$REPO_URL/files/setup/data/autodesk_fusion_launcher.sh" "$SELECTED_DIRECTORY/bin"
     chmod +x "$SELECTED_DIRECTORY/bin/autodesk_fusion_launcher.sh"
     download_file "fix-navbar-flicker.sh" "$REPO_URL/files/setup/data/fix-navbar-flicker.sh" "$SELECTED_DIRECTORY/bin"
@@ -1704,53 +1676,26 @@ autodesk_fusion_run_install_client() {
 }
 
 #################################################################################################################################################################
-# Patch the Qt6WebEngineCore.dll to fix the login issue and other issues                                                                                        #
-#################################################################################################################################################################
-autodesk_fusion_patch_qt6webenginecore() {
-    # Find the Qt6WebEngineCore.dll file in the Autodesk Fusion directory
-    QT6_WEBENGINECORE=$(find "$WINE_PFX" -name 'Qt6WebEngineCore.dll' -printf "%T+ %p\n" | sort -r | head -n 1 | sed -r 's/^[^ ]+ //')
-    QT6_WEBENGINECORE_DIR=$(dirname "$QT6_WEBENGINECORE")
-
-    echo "$QT6_WEBENGINECORE_DIR"
-
-    echo -e "${YELLOW}The old Qt6WebEngineCore.dll file is located in the following directory: $QT6_WEBENGINECORE_DIR${NOCOLOR}"
-
-    # Check if the Qt6WebEngineCore.dll file exists before attempting to backup
-    if [ -f "$QT6_WEBENGINECORE_DIR/Qt6WebEngineCore.dll" ]; then
-        # Backup the Qt6WebEngineCore.dll file
-        cp -f "$QT6_WEBENGINECORE_DIR/Qt6WebEngineCore.dll" "$QT6_WEBENGINECORE_DIR/Qt6WebEngineCore.dll.bak"
-        echo -e "${GREEN}The Qt6WebEngineCore.dll file is backed up as Qt6WebEngineCore.dll.bak!${NOCOLOR}"
-    else
-        echo -e "${RED}The Qt6WebEngineCore.dll file does not exist. No backup was made.${NOCOLOR}"
-    fi
-
-    # Patch the Qt6WebEngineCore.dll file
-    echo -e "${YELLOW}Patching the Qt6WebEngineCore.dll file for Autodesk Fusion ...${NOCOLOR}"
-    sleep 2
-
-    # Copy the patched Qt6WebEngineCore.dll file to the Autodesk Fusion directory
-    cp -f "$SELECTED_DIRECTORY/downloads/Qt6WebEngineCore.dll" "$QT6_WEBENGINECORE_DIR/Qt6WebEngineCore.dll"
-    echo -e "${GREEN}The Qt6WebEngineCore.dll file is patched successfully!${NOCOLOR}"
-}  
-
-#################################################################################################################################################################
 # Add/Patch the siappdll.dll to fix the SpaceMouse issue                                                                                                        #
 #################################################################################################################################################################
 autodesk_fusion_patch_siappdll() {
     echo -e "${YELLOW}Patching the siappdll.dll file for Autodesk Fusion ...${NOCOLOR}"
     sleep 2
+
+    SIAPPDLL=$(find "$WINE_PFX" -name 'Qt6WebEngineCore.dll' -printf "%T+ %p\n" | sort -r | head -n 1 | sed -r 's/^[^ ]+ //')
+    SIAPPDLL_DIR=$(dirname "$SIAPPDLL")
     
     # Check if the siappdll.dll file exists before attempting to backup
-    if [ -f "$QT6_WEBENGINECORE_DIR/siappdll.dll" ]; then
+    if [ -f "$SIAPPDLL_DIR/siappdll.dll" ]; then
         # Backup the siappdll.dll file
-        cp -f "$QT6_WEBENGINECORE_DIR/siappdll.dll" "$QT6_WEBENGINECORE_DIR/siappdll.dll.bak"
+        cp -f "$SIAPPDLL_DIR/siappdll.dll" "$SIAPPDLL_DIR/siappdll.dll.bak"
         echo -e "${GREEN}The siappdll.dll file is backed up as siappdll.dll.bak!${NOCOLOR}"
     else
         echo -e "${RED}The siappdll.dll file does not exist. No backup was made.${NOCOLOR}"
     fi
 
     # Copy the patched siappdll.dll file to the Autodesk Fusion directory
-    cp -f "$SELECTED_DIRECTORY/downloads/siappdll.dll" "$QT6_WEBENGINECORE_DIR/siappdll.dll"
+    cp -f "$SELECTED_DIRECTORY/downloads/siappdll.dll" "$SIAPPDLL_DIR/siappdll.dll"
     echo -e "${GREEN}The siappdll.dll file is patched successfully!${NOCOLOR}"
 }
 
@@ -1829,13 +1774,9 @@ wine_autodesk_fusion_install() {
     "$WINE" REG ADD "HKCU\Software\Wine\DllOverrides" /v "bcp47langs" /t REG_SZ /d "" /f
     "$WINE" REG ADD "HKCU\Software\Wine\X11 Driver" /v "Managed" /t REG_SZ /d "Y" /f
     "$WINE" REG ADD "HKCU\Software\Wine\X11 Driver" /v "Decorated" /t REG_SZ /d "Y" /f
-    # Install 7-Zip inside the Wine prefix via winetricks.
-    # This method does NOT require 7-Zip on the host system and is more stable/reliable than previous approaches.
-    "$WINETRICKS" -q 7zip >> "$SELECTED_DIRECTORY/logs/winetricks_7zip.log" 2>&1
-    "$WINE" "$WINE_PFX/drive_c/Program Files/7-Zip/7z.exe" x "C:\\users\\$USER\\Downloads\\Qt6WebEngineCore.dll.7z" -o"C:\\users\\$USER\\Downloads\\"
     # For WebView2installer -v 109
     echo -e "$(gettext "${YELLOW}Installing Microsoft Edge WebView2 Runtime for Autodesk Fusion ...${NOCOLOR}")"
-    "$WINE" "$WIN_DOWNLOADS_DIRECTORY/WebView2installer.exe" /silent /install 2>> "$SELECTED_DIRECTORY/logs/WebView2_install.log"
+    "$WINE" "$WIN_DOWNLOADS_DIRECTORY/MicrosoftEdgeWebView2RuntimeInstallerX64.exe" /silent /install 2>> "$SELECTED_DIRECTORY/logs/WebView2_install.log"
     echo -e "$(gettext "${GREEN}Microsoft Edge WebView2 Runtime installation completed!${NOCOLOR}")"
     APPDATA_DIRECTORY="$WINE_PFX/drive_c/users/$USER/AppData"
     APPLICATION_DATA_DIRECTORY="$WINE_PFX/drive_c/users/$USER/Application Data"
