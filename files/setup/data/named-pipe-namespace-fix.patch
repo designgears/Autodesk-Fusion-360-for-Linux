@@ -1,0 +1,36 @@
+diff --git a/server/named_pipe.c b/server/named_pipe.c
+index 13982d1..0e4ea27 100644
+--- a/server/named_pipe.c
++++ b/server/named_pipe.c
+@@ -536,7 +536,13 @@ static void pipe_server_destroy( struct object *obj )
+     assert( obj->ops == &pipe_server_ops );
+ 
+     assert( pipe->instances );
+-    if (!--pipe->instances) unlink_named_object( &pipe->obj );
++    /* Don't unlink the named pipe when the last server endpoint is destroyed.
++     * Windows keeps the name available as long as any handle (server or client)
++     * is open; on Wine we previously unlinked on instances==0, which made
++     * subsequent client opens race against the next CreateNamedPipe call.
++     * Keep the pipe linked; it stays referenced by the namespace and is freed
++     * when explicitly unlinked or the namespace itself drops it. */
++    --pipe->instances;
+     if (server->pipe_end.state == FILE_PIPE_LISTENING_STATE)
+         list_remove( &server->entry );
+ 
+@@ -1481,6 +1487,16 @@ static int named_pipe_link_name( struct object *obj, struct object_name *name, s
+     }
+     namespace_add( ((struct named_pipe_device *)parent)->pipes, name );
+     name->parent = grab_object( parent );
++    /* Hold an extra reference for the namespace registration.  Without this
++     * the pipe object is destroyed (and auto-unlinked) as soon as the last
++     * pipe_server/pipe_client handle is closed.  On Windows the name remains
++     * registered while at least one CreateNamedPipe instance has ever existed
++     * for the name (the pipe gets dropped only when explicit unlink happens or
++     * the device itself is destroyed).  Matching that behaviour keeps the name
++     * stable across the brief gaps between accepting a connection and
++     * re-issuing CreateNamedPipe for the next listener, which Boost.Asio's
++     * IOCP-based servers (e.g. Autodesk's adexmtsv) rely on. */
++    grab_object( obj );
+     return 1;
+ }
+ 
