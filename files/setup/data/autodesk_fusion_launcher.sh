@@ -7,8 +7,8 @@
 # Author URI:   https://cryinkfly.com                                       #
 # License:      MIT                                                         #
 # Copyright (c) 2020-2026                                                   #
-# Time/Date:    18:57/20.05.2026                                            #
-# Version:      2.1.5-Alpha                                                 #
+# Time/Date:    08:00/20.06.2026                                            #
+# Version:      2.1.6-Alpha                                                 #
 #############################################################################
 
 # Path: SELECTED__INSTALLATION_PATH/bin/autodesk_fusion_launcher.sh
@@ -105,18 +105,16 @@ function run_autodesk_fusion() {
         run_autodesk_fusion_proton
     fi
 }
-# You must change the first part ($HOME/.wineprefixes/fusion360) and the last part (WINEPREFIX="$HOME/.wineprefixes/fusion360") when you have installed Autodesk Fusion 360 into another directory!
+
 function run_autodesk_fusion_wine() {
     LAUNCHER="$(find "$WINE_PFX" -name Fusion360.exe -printf "%T+ %p\n" | sort -r 2>&1 | head -n 1 | cut -d' ' -f2-)"
 
     echo $LAUNCHER
 
+    DXVK_LOG_LEVEL=none \
     WINEPREFIX="$WINE_PFX" \
-    WINEDEBUG=-all \
+    WINEDEBUG=-all,+err \
     wine "$LAUNCHER" &
-
-    # WINEDEBUG=-all = Logs everything, probably gives too much information in most cases, but may come in handy for subtle issues
-    # WINEDEBUG=-d3d = Will turn off all d3d messages, and additionally disable checking for GL errors after operations. This may improve performance.
 
     WINEPID=$!
     wait "$WINEPID"
@@ -131,13 +129,11 @@ function run_autodesk_fusion_wine_fix() {
 
     echo $LAUNCHER
 
+    DXVK_LOG_LEVEL=none \
     WINEPREFIX="$WINE_PFX" \
     WINESERVER="$WINE_BUILD_DIR/wineserver" \
-    WINEDEBUG=-all \
+    WINEDEBUG=-all,+err \
     $WINE_BUILD_DIR/wine "$LAUNCHER" &
-
-    # WINEDEBUG=-all = Logs everything, probably gives too much information in most cases, but may come in handy for subtle issues
-    # WINEDEBUG=-d3d = Will turn off all d3d messages, and additionally disable checking for GL errors after operations. This may improve performance.
 
     WINEPID=$!
     wait "$WINEPID"
@@ -147,7 +143,6 @@ function run_autodesk_fusion_wine_fix() {
 
 function run_autodesk_fusion_proton() {
     LAUNCHER="$(find "$WINE_PFX" -name Fusion360.exe -printf "%T+ %p\n" | sort -r 2>&1 | head -n 1 | cut -d' ' -f2-)"
-    #LAUNCHER_WIN=$(echo "$LAUNCHER" | sed "s|$PROTONPREFIX_DIRECTORY/pfx/drive_c|C:|" | sed 's|/|\\|g')
     STEAM_DIRECTORY="$HOME/.local/share/Steam"
     PROTON_DIRECTORY="$STEAM_DIRECTORY/compatibilitytools.d/$PROTON_VERSION"
     
