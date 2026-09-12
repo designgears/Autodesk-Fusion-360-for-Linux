@@ -1,0 +1,23 @@
+Subject: [PATCH] user32: Ignore desktop/winstation security descriptors (fixes Fusion data panel / WebView2)
+---
+diff --git a/dlls/user32/winstation.c b/dlls/user32/winstation.c
+--- a/dlls/user32/winstation.c
++++ b/dlls/user32/winstation.c
+@@ -155,7 +155,7 @@
+     if (!str.Length) RtlInitUnicodeString( &str, get_winstation_default_name() );
+ 
+     InitializeObjectAttributes( &attr, &str, OBJ_CASE_INSENSITIVE,
+-                                get_winstations_dir_handle(), sa ? sa->lpSecurityDescriptor : NULL );
++                                get_winstations_dir_handle(), NULL );
+     if (!(flags & CWF_CREATE_ONLY)) attr.Attributes |= OBJ_OPENIF;
+     if (sa && sa->bInheritHandle) attr.Attributes |= OBJ_INHERIT;
+ 
+@@ -263,7 +263,7 @@
+ 
+     RtlInitUnicodeString( &str, name );
+     InitializeObjectAttributes( &attr, &str, OBJ_CASE_INSENSITIVE | OBJ_OPENIF,
+-                                NtUserGetProcessWindowStation(), sa ? sa->lpSecurityDescriptor : NULL );
++                                NtUserGetProcessWindowStation(), NULL );
+     if (sa && sa->bInheritHandle) attr.Attributes |= OBJ_INHERIT;
+     return NtUserCreateDesktopEx( &attr, NULL, devmode, flags, access, 0 );
+ }
