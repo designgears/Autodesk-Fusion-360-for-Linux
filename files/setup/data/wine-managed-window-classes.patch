@@ -11,7 +11,7 @@ diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
  
  #define _NET_WM_MOVERESIZE_SIZE_TOPLEFT      0
  #define _NET_WM_MOVERESIZE_SIZE_TOP          1
-@@ -430,16 +431,56 @@
+@@ -430,16 +431,68 @@
  }
  
  
@@ -60,6 +60,18 @@ diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
   * Check if a given window should be managed
   */
 -static BOOL is_window_managed( HWND hwnd, UINT swp_flags, BOOL fullscreen )
++/* Translucent overlays must not be activation targets, the WM raises them over the dialog they dim. */
++BOOL class_is_forced_managed_overlay( HWND hwnd )
++{
++    DWORD ex_style;
++
++    if (!class_is_forced_managed( hwnd )) return FALSE;
++    /* Both flags: the dialog is layered too, but is not a tool window and must stay activatable. */
++    ex_style = NtUserGetWindowLongW( hwnd, GWL_EXSTYLE );
++    return (ex_style & (WS_EX_LAYERED|WS_EX_TOOLWINDOW)) == (WS_EX_LAYERED|WS_EX_TOOLWINDOW);
++}
++
++
 +static BOOL is_window_managed_default( HWND hwnd, UINT swp_flags, BOOL fullscreen )
  {
      DWORD style, ex_style;
@@ -69,7 +81,7 @@ diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
  
      /* child windows are not managed */
      style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
-@@ -469,6 +510,31 @@
+@@ -467,6 +520,31 @@
      return FALSE;
  }
  
@@ -101,3 +113,65 @@ diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
  
  /***********************************************************************
   *		is_window_resizable
+@@ -1134,6 +1212,7 @@
+     {
+         wm_hints->flags = InputHint | StateHint | WindowGroupHint;
+         wm_hints->input = !use_take_focus && !(style & WS_DISABLED);
++        if (class_is_forced_managed_overlay( data->hwnd )) wm_hints->input = False;
+         wm_hints->initial_state = (style & WS_MINIMIZE) ? IconicState : NormalState;
+         wm_hints->window_group = group_leader;
+         if (data->icon_pixmap)
+@@ -1146,6 +1225,20 @@
+         XFree( wm_hints );
+     }
+ 
++    /* WM_PROTOCOLS is set at window creation, before the styles are known, so refresh it here. */
++    if (data->whole_window)
++    {
++        Atom protocols[3];
++        int count = 0;
++
++        protocols[count++] = x11drv_atom(WM_DELETE_WINDOW);
++        protocols[count++] = x11drv_atom(_NET_WM_PING);
++        if (use_take_focus && !class_is_forced_managed_overlay( data->hwnd ))
++            protocols[count++] = x11drv_atom(WM_TAKE_FOCUS);
++        XChangeProperty( data->display, data->whole_window, x11drv_atom(WM_PROTOCOLS),
++                         XA_ATOM, 32, PropModeReplace, (unsigned char *)protocols, count );
++    }
++
+     window_set_net_wm_icon( data, data->icon_bits, data->icon_size );
+ }
+ 
+diff --git a/dlls/winex11.drv/x11drv.h b/dlls/winex11.drv/x11drv.h
+--- a/dlls/winex11.drv/x11drv.h
++++ b/dlls/winex11.drv/x11drv.h
+@@ -472,6 +472,7 @@
+ extern BOOL grab_fullscreen;
+ extern BOOL usexcomposite;
+ extern BOOL managed_mode;
++extern BOOL class_is_forced_managed_overlay( HWND hwnd );
+ extern BOOL private_color_map;
+ extern int primary_monitor;
+ extern int copy_default_colors;
+diff --git a/dlls/winex11.drv/mouse.c b/dlls/winex11.drv/mouse.c
+--- a/dlls/winex11.drv/mouse.c
++++ b/dlls/winex11.drv/mouse.c
+@@ -1541,6 +1541,18 @@
+ 
+     TRACE( "hwnd %p/%lx button %u pos %d,%d\n", hwnd, event->window, buttonNum, event->x, event->y );
+ 
++    /* An overlay takes no focus, so activate the owner's modal dialog like Windows does. */
++    if (class_is_forced_managed_overlay( hwnd ))
++    {
++        HWND owner = NtUserGetWindowRelative( hwnd, GW_OWNER ), target = 0;
++
++        if (owner) target = NtUserGetLastActivePopup( owner );
++        if (!target) target = owner;
++        TRACE( "overlay %p clicked, activating %p instead\n", hwnd, target );
++        if (target) NtUserSetForegroundWindowInternal( target );
++        return TRUE;
++    }
++
+     input.mi.dx          = event->x;
+     input.mi.dy          = event->y;
+     input.mi.mouseData   = button_down_data[buttonNum];
