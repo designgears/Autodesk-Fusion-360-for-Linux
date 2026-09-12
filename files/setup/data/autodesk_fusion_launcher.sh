@@ -96,6 +96,10 @@ function update() {
     run_autodesk_fusion
 }
 
+# Window classes the patched winex11.drv should manage instead of leaving override-redirect.
+WINE_X11_MANAGED_CLASSES="${WINE_X11_MANAGED_CLASSES-Qt683QWindowToolSaveBits,Qt683QWindowToolSaveBitsOwnDC,Qt683QWindow}"
+export WINE_X11_MANAGED_CLASSES
+
 function run_autodesk_fusion() {
     if [ "$PROTON_VERSION" == "Wine" ]; then
         run_autodesk_fusion_wine

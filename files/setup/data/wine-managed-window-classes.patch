@@ -1,0 +1,103 @@
+Subject: [PATCH] winex11: manage window classes listed in WINE_X11_MANAGED_CLASSES
+---
+diff --git a/dlls/winex11.drv/window.c b/dlls/winex11.drv/window.c
+--- a/dlls/winex11.drv/window.c
++++ b/dlls/winex11.drv/window.c
+@@ -55,6 +55,7 @@
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(x11drv);
+ WINE_DECLARE_DEBUG_CHANNEL(systray);
++WINE_DECLARE_DEBUG_CHANNEL(managed);
+ 
+ #define _NET_WM_MOVERESIZE_SIZE_TOPLEFT      0
+ #define _NET_WM_MOVERESIZE_SIZE_TOP          1
+@@ -430,16 +431,56 @@
+ }
+ 
+ 
++static BOOL class_is_forced_managed( HWND hwnd )
++{
++    static const char *list;
++    static BOOL initialized;
++
++    WCHAR class_name[64];
++    UNICODE_STRING str = { .Buffer = class_name, .MaximumLength = sizeof(class_name) };
++    char buffer[64];
++    const char *p;
++    unsigned int i;
++    DWORD style;
++
++    if (!initialized)
++    {
++        list = getenv( "WINE_X11_MANAGED_CLASSES" );
++        initialized = TRUE;
++    }
++    if (!list || !*list) return FALSE;
++
++    style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
++    if ((style & (WS_CHILD|WS_POPUP)) == WS_CHILD) return FALSE;
++
++    memset( class_name, 0, sizeof(class_name) );
++    if (NtUserGetClassName( hwnd, FALSE, &str ) <= 0) return FALSE;
++
++    for (i = 0; i < sizeof(buffer) - 1 && class_name[i]; i++) buffer[i] = (char)class_name[i];
++    buffer[i] = 0;
++
++    for (p = list; *p;)
++    {
++        const char *end = strchr( p, ',' );
++        size_t len = end ? (size_t)(end - p) : strlen( p );
++
++        if (len && len == strlen( buffer ) && !strncmp( p, buffer, len )) return TRUE;
++        p = end ? end + 1 : p + len;
++    }
++    return FALSE;
++}
++
+ /***********************************************************************
+  *		is_window_managed
+  *
+  * Check if a given window should be managed
+  */
+-static BOOL is_window_managed( HWND hwnd, UINT swp_flags, BOOL fullscreen )
++static BOOL is_window_managed_default( HWND hwnd, UINT swp_flags, BOOL fullscreen )
+ {
+     DWORD style, ex_style;
+ 
+     if (!managed_mode) return FALSE;
++    if (class_is_forced_managed( hwnd )) return TRUE;
+ 
+     /* child windows are not managed */
+     style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
+@@ -469,6 +510,31 @@
+     return FALSE;
+ }
+ 
++static BOOL is_window_managed( HWND hwnd, UINT swp_flags, BOOL fullscreen )
++{
++    BOOL ret = is_window_managed_default( hwnd, swp_flags, fullscreen );
++
++    if (TRACE_ON(managed))
++    {
++        WCHAR class_name[64];
++        UNICODE_STRING str = { .Buffer = class_name, .MaximumLength = sizeof(class_name) };
++        RECT rect = {0};
++
++        memset( class_name, 0, sizeof(class_name) );
++        NtUserGetClassName( hwnd, FALSE, &str );
++        NtUserGetWindowRect( hwnd, &rect, NtUserGetDpiForWindow( hwnd ) );
++        TRACE_(managed)( "hwnd %p class %s style %#x ex_style %#x swp_flags %#x owner %p rect %dx%d+%d+%d -> %s\n",
++                         hwnd, debugstr_w(class_name),
++                         (UINT)NtUserGetWindowLongW( hwnd, GWL_STYLE ),
++                         (UINT)NtUserGetWindowLongW( hwnd, GWL_EXSTYLE ),
++                         swp_flags, NtUserGetWindowRelative( hwnd, GW_OWNER ),
++                         (int)(rect.right - rect.left), (int)(rect.bottom - rect.top),
++                         (int)rect.left, (int)rect.top,
++                         ret ? "managed" : "unmanaged" );
++    }
++    return ret;
++}
++
+ 
+ /***********************************************************************
+  *		is_window_resizable

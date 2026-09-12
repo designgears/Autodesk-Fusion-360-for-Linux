@@ -1073,16 +1073,41 @@ Pin-Priority: 1000
 
 PATCH_POPUPS_FILE="/tmp/wine-captionless-popups.patch"
 PATCH_POPUPS_URL="$REPO_URL/files/setup/data/wine-captionless-popups.patch"
+PATCH_MANAGED_FILE="/tmp/wine-managed-window-classes.patch"
+PATCH_MANAGED_URL="$REPO_URL/files/setup/data/wine-managed-window-classes.patch"
+
+# Applies a patch to the current source tree, tolerating an already-applied patch.
+apply_source_patch() {
+    local patch_file="$1"
+    local label="$2"
+
+    echo -e "${YELLOW}Applying $label...${NOCOLOR}"
+    if patch -p1 --dry-run < "$patch_file" >/dev/null 2>&1; then
+        patch -p1 < "$patch_file" || {
+            echo -e "${RED}Patch failed to apply. Skipping patched build.${NOCOLOR}"
+            exit 1
+        }
+    elif patch -R -p1 --dry-run < "$patch_file" >/dev/null 2>&1; then
+        echo -e "${YELLOW}Patch already applied. Skipping patch step.${NOCOLOR}"
+    else
+        echo -e "${RED}Patch does not match this source tree!${NOCOLOR}"
+        exit 1
+    fi
+}
 build_patched_wine() {
     WINE_SOURCE_DIR="$HOME/fusion-wine-source"
 
     rm -rf "$WINE_BUILD_DIR"
-    rm -f "$PATCH_POPUPS_FILE" "$PATCH_PIPE_FILE"
+    rm -f "$PATCH_POPUPS_FILE" "$PATCH_MANAGED_FILE" "$PATCH_PIPE_FILE"
     echo -e "${YELLOW}Building patched Wine for Fusion 360 window fix (this will take 15-30 minutes)...${NOCOLOR}"
 
     # Download patches
     echo -e "${YELLOW}Downloading Wine patches...${NOCOLOR}"
     curl -L "$PATCH_POPUPS_URL" -o "$PATCH_POPUPS_FILE" || {
+        echo -e "${RED}Failed to download Wine patch. Skipping patched build.${NOCOLOR}"
+        exit 1
+    }
+    curl -L "$PATCH_MANAGED_URL" -o "$PATCH_MANAGED_FILE" || {
         echo -e "${RED}Failed to download Wine patch. Skipping patched build.${NOCOLOR}"
         exit 1
     }
@@ -1113,6 +1138,7 @@ build_patched_wine() {
         echo -e "${RED}Patch does not match this source tree!${NOCOLOR}"
         exit 1
     fi
+    apply_source_patch "$PATCH_MANAGED_FILE" "managed window classes patch"
 
     # Build and install
     echo -e "${YELLOW}Configuring Wine...${NOCOLOR}"
@@ -1151,6 +1177,10 @@ build_patched_proton() {
         echo -e "${RED}Failed to download Proton patch. Skipping patched build.${NOCOLOR}"
         exit 1
     }
+    curl -L "$PATCH_MANAGED_URL" -o "$PATCH_MANAGED_FILE" || {
+        echo -e "${RED}Failed to download Proton patch. Skipping patched build.${NOCOLOR}"
+        exit 1
+    }
 
     # Clone Proton source
     if [ -d "$PROTON_SOURCE_DIR" ]; then
@@ -1180,6 +1210,7 @@ build_patched_proton() {
         echo -e "${RED}Patch does not match this source tree!${NOCOLOR}"
         exit 1
     fi
+    apply_source_patch "$PATCH_MANAGED_FILE" "managed window classes patch"
 
     # Build and install
     echo -e "${YELLOW}Configuring Proton...${NOCOLOR}"
