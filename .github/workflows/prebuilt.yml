@@ -1,0 +1,132 @@
+name: Prebuilt Wine and Proton
+
+# Push a tag like prebuilt-wine-proton-2026.09.12, or run it by hand from the Actions tab.
+on:
+  push:
+    tags:
+      - "prebuilt-*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create or update"
+        required: true
+      build_wine:
+        description: "Build Wine"
+        type: boolean
+        default: true
+      build_proton:
+        description: "Build Proton"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+env:
+  RELEASE_TAG: ${{ github.event_name == 'push' && github.ref_name || inputs.tag }}
+  WINE_VERSION: "11.17"
+  # The proton patches are rebased onto this GE commit, bump both together
+  GE_REF: 0b8c4d30
+  PROTON_BUILD_NAME: GE-Proton11-Fusion
+  GH_TOKEN: ${{ github.token }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create the release if it doesn't exist
+        run: |
+          gh release view "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" >/dev/null 2>&1 ||
+            gh release create "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+              --title "Prebuilt Wine and Proton ($RELEASE_TAG)" \
+              --notes "Patched builds used by the installer."
+
+  wine:
+    needs: release
+    if: github.event_name == 'push' || inputs.build_wine
+    # Older glibc so the build runs on more distros
+    runs-on: ubuntu-22.04
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          sudo sed -i 's/^# deb-src/deb-src/' /etc/apt/sources.list
+          sudo apt-get update
+          sudo apt-get build-dep -y wine
+          sudo apt-get install -y gcc-mingw-w64 flex bison
+
+      - name: Get the Wine source
+        run: git clone --depth 1 --branch "wine-$WINE_VERSION" https://gitlab.winehq.org/wine/wine.git wine-src
+
+      - name: Apply the patches
+        working-directory: wine-src
+        run: |
+          for p in wine-captionless-popups wine-managed-window-classes wine-user32-ignore-desktop-sd wine-present-wait-damage; do
+            echo "Applying $p"
+            patch -p1 < "$GITHUB_WORKSPACE/files/setup/data/$p.patch"
+          done
+
+      - name: Build
+        working-directory: wine-src
+        run: |
+          ./configure --prefix="$HOME/fusion-wine-build" --enable-archs=i386,x86_64 --disable-tests
+          make -j"$(nproc)"
+          make install
+
+      - name: Upload to the release
+        run: |
+          tar -C "$HOME" -czf fusion-wine-build.tar.gz fusion-wine-build
+          sha256sum fusion-wine-build.tar.gz > fusion-wine-build.tar.gz.sha256
+          gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --clobber \
+            fusion-wine-build.tar.gz fusion-wine-build.tar.gz.sha256
+
+  proton:
+    needs: release
+    if: github.event_name == 'push' || inputs.build_proton
+    runs-on: ubuntu-24.04
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Free up disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          sudo docker image prune -af
+          df -h / /mnt
+
+      - name: Get the GE-Proton source
+        run: |
+          git clone https://github.com/GloriousEggroll/proton-ge-custom.git proton-src
+          cd proton-src
+          git checkout "$GE_REF"
+          git submodule update --init --recursive --depth 1 --jobs 4
+          # protonprep reverts commits in wine, those need their history
+          for sha in $(grep -E '^[[:space:]]*git revert' patches/protonprep-valve-staging.sh | grep -oE '[0-9a-f]{40}'); do
+            git -C wine fetch --depth 2 origin "$sha"
+          done
+
+      - name: Apply the patches
+        working-directory: proton-src
+        run: |
+          ./patches/protonprep-valve-staging.sh
+          cd wine
+          for p in wine-captionless-popups wine-managed-window-classes-proton wine-present-wait-damage-proton; do
+            echo "Applying $p"
+            patch -p1 < "$GITHUB_WORKSPACE/files/setup/data/$p.patch"
+          done
+
+      - name: Build
+        run: |
+          mkdir proton-build
+          cd proton-build
+          ../proton-src/configure.sh --build-name="$PROTON_BUILD_NAME" --container-engine=docker
+          make -j"$(nproc)" redist
+
+      - name: Upload to the release
+        working-directory: proton-build
+        run: |
+          sha256sum "$PROTON_BUILD_NAME.tar.gz" > "$PROTON_BUILD_NAME.tar.gz.sha256"
+          gh release upload "$RELEASE_TAG" -R "$GITHUB_REPOSITORY" --clobber \
+            "$PROTON_BUILD_NAME.tar.gz" "$PROTON_BUILD_NAME.tar.gz.sha256"

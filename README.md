@@ -1,3 +1,41 @@
+# Autodesk Fusion on Linux (designgears fork)
+
+This is a fork of [cryinkfly's Autodesk Fusion 360 on Linux](https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux) with a patched Wine and Proton that fix the problems I kept running into. The original README is below. Its install commands still point at the original repo, use the ones here to get the fixes.
+
+### What's fixed
+
+- Dialogs, flyouts and the Advanced capabilities window get managed by the window manager properly
+- The dim overlay behind dialogs no longer steals focus, clicking it brings the dialog back
+- The data panel on the left works again on Wine 11.16 and newer
+- The 3D viewport no longer smears (Fusion's own shader compiler is used)
+- The viewport and timeline no longer lag a frame behind until you move the mouse
+
+The patches live in `files/setup/data/`. Prebuilt Wine 11.17 and GE-Proton builds with them applied are on the [releases page](https://github.com/designgears/Autodesk-Fusion-360-for-Linux/releases), and the installer downloads them for you.
+
+### Install
+
+Patched Wine (recommended):
+
+```
+curl -L https://raw.githubusercontent.com/designgears/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install-fix --default
+```
+
+Patched Proton:
+
+```
+curl -L https://raw.githubusercontent.com/designgears/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --proton=GE-Proton11-Fusion --default
+```
+
+Build them yourself instead of downloading, use `--build wine-fix` or `--build proton-fix`.
+
+libXdamage is required for the viewport fix. The installer checks for it and installs it if it's missing.
+
+### Prebuilt releases
+
+The builds on the releases page come from the `Prebuilt Wine and Proton` GitHub Actions workflow. Push a tag starting with `prebuilt-` (or run the workflow from the Actions tab) and it builds both, then uploads them to a release with that tag. If you make a new release, point `PREBUILT_URL` in the installer at the new tag.
+
+---
+
 # Autodesk Fusion 360 on Linux
 
 <img align="center" src="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-for-Linux/raw/branch/main/files/images/autodesk-fusion-linux-logo.png" width="250px" height="250px">
