@@ -1,18 +1,5 @@
-diff --git a/dlls/winex11.drv/Makefile.in b/dlls/winex11.drv/Makefile.in
-index b10be2c519b..6a48455c71b 100644
---- a/dlls/winex11.drv/Makefile.in
-+++ b/dlls/winex11.drv/Makefile.in
-@@ -1,7 +1,7 @@
- MODULE    = winex11.drv
- UNIXLIB   = winex11.so
- UNIX_CFLAGS  = $(X_CFLAGS) $(XKBREGISTRY_CFLAGS)
--UNIX_LIBS    = -lwin32u $(X_LIBS) $(PTHREAD_LIBS) -lm
-+UNIX_LIBS    = -lwin32u -lXdamage $(X_LIBS) $(PTHREAD_LIBS) -lm
- 
- VER_FILEDESCRIPTION_STR = "Wine X11 driver"
- 
 diff --git a/dlls/winex11.drv/init.c b/dlls/winex11.drv/init.c
-index 8d91aca1e49..82dd5f6e5f8 100644
+index 8d91aca1e49..d5153a3c5fc 100644
 --- a/dlls/winex11.drv/init.c
 +++ b/dlls/winex11.drv/init.c
 @@ -23,6 +23,8 @@
@@ -24,12 +11,33 @@ index 8d91aca1e49..82dd5f6e5f8 100644
  
  #include <stdarg.h>
  #include <string.h>
-@@ -378,6 +380,62 @@ static void x11drv_client_surface_update( struct client_surface *client )
+@@ -378,6 +380,90 @@ static void x11drv_client_surface_update( struct client_surface *client )
      client_surface_update_offscreen( hwnd, surface );
  }
  
++#include <dlfcn.h>
 +#include <poll.h>
-+#include <X11/extensions/Xdamage.h>
++
++/* libXdamage is loaded at runtime so building does not need it, the wait is skipped without it */
++typedef XID Damage;
++typedef struct
++{
++    int type;
++    unsigned long serial;
++    Bool send_event;
++    Display *display;
++    Drawable drawable;
++    Damage damage;
++    int level;
++    Bool more;
++    Time timestamp;
++    XRectangle area;
++    XRectangle geometry;
++} XDamageNotifyEvent;
++
++static Bool (*pXDamageQueryExtension)( Display *display, int *event_base, int *error_base );
++static Damage (*pXDamageCreate)( Display *display, Drawable drawable, int level );
++static void (*pXDamageSubtract)( Display *display, Damage damage, XID repair, XID parts );
 +
 +/* the driver presents asynchronously, wait until the new frame lands in the child window before copying it */
 +static void wait_present_damage( Window window )
@@ -41,7 +49,14 @@ index 8d91aca1e49..82dd5f6e5f8 100644
 +    int i, slot = -1, remaining, error;
 +
 +    if (enabled < 0)
-+        enabled = (damage_display = XOpenDisplay( NULL )) && XDamageQueryExtension( damage_display, &damage_event, &error );
++    {
++        void *handle = dlopen( "libXdamage.so.1", RTLD_NOW );
++        enabled = handle && (pXDamageQueryExtension = dlsym( handle, "XDamageQueryExtension" )) &&
++                  (pXDamageCreate = dlsym( handle, "XDamageCreate" )) &&
++                  (pXDamageSubtract = dlsym( handle, "XDamageSubtract" )) &&
++                  (damage_display = XOpenDisplay( NULL )) &&
++                  pXDamageQueryExtension( damage_display, &damage_event, &error );
++    }
 +    if (!enabled || !window) return;
 +
 +    for (i = 0; i < ARRAY_SIZE(slots); i++) if (slots[i].window == window) { slot = i; break; }
@@ -50,7 +65,7 @@ index 8d91aca1e49..82dd5f6e5f8 100644
 +        for (i = 0; i < ARRAY_SIZE(slots); i++) if (!slots[i].window) { slot = i; break; }
 +        if (slot < 0) return;
 +        slots[slot].window = window;
-+        XDamageCreate( damage_display, window, XDamageReportNonEmpty );
++        pXDamageCreate( damage_display, window, 3 /* XDamageReportNonEmpty */ );
 +        XSync( damage_display, False );
 +        return;
 +    }
@@ -63,13 +78,13 @@ index 8d91aca1e49..82dd5f6e5f8 100644
 +        {
 +            XEvent event;
 +            XNextEvent( damage_display, &event );
-+            if (event.type != damage_event + XDamageNotify) continue;
++            if (event.type != damage_event /* + XDamageNotify */) continue;
 +            for (i = 0; i < ARRAY_SIZE(slots); i++)
 +            {
 +                XDamageNotifyEvent *notify = (XDamageNotifyEvent *)&event;
 +                if (slots[i].window != notify->drawable) continue;
 +                slots[i].pending = FALSE;
-+                XDamageSubtract( damage_display, notify->damage, None, None );
++                pXDamageSubtract( damage_display, notify->damage, None, None );
 +            }
 +        }
 +        if (!slots[slot].pending) break;
@@ -87,7 +102,7 @@ index 8d91aca1e49..82dd5f6e5f8 100644
  static void X11DRV_client_surface_present( struct client_surface *client, HDC hdc )
  {
      struct x11drv_client_surface *surface = impl_from_client_surface( client );
-@@ -401,6 +459,7 @@ static void X11DRV_client_surface_present( struct client_surface *client, HDC hd
+@@ -401,6 +487,7 @@ static void X11DRV_client_surface_present( struct client_surface *client, HDC hd
          set_dc_drawable( surface->hdc_dst, window, &rect_dst, IncludeInferiors );
      if (region) NtGdiExtSelectClipRgn( surface->hdc_dst, region, RGN_COPY );
  
