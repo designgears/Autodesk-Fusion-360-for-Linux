@@ -1,0 +1,167 @@
+--- a/dlls/winex11.drv/mouse.c
++++ b/dlls/winex11.drv/mouse.c
+@@ -1614,6 +1614,18 @@
+         release_win_data( data );
+     }
+ 
++    /* An overlay takes no focus, so activate the owner's modal dialog like Windows does. */
++    if (class_is_forced_managed_overlay( hwnd ))
++    {
++        HWND owner = NtUserGetWindowRelative( hwnd, GW_OWNER ), target = 0;
++
++        if (owner) target = NtUserGetLastActivePopup( owner );
++        if (!target) target = owner;
++        TRACE( "overlay %p clicked, activating %p instead\n", hwnd, target );
++        if (target) NtUserSetForegroundWindowInternal( target );
++        return TRUE;
++    }
++
+     map_event_coords( hwnd, event->window, event->root, event->x_root, event->y_root, &input );
+     send_mouse_input( hwnd, event->window, event->state, &input );
+     return TRUE;
+--- a/dlls/winex11.drv/window.c
++++ b/dlls/winex11.drv/window.c
+@@ -56,6 +56,7 @@
+ 
+ WINE_DEFAULT_DEBUG_CHANNEL(x11drv);
+ WINE_DECLARE_DEBUG_CHANNEL(systray);
++WINE_DECLARE_DEBUG_CHANNEL(managed);
+ 
+ #define _NET_WM_MOVERESIZE_SIZE_TOPLEFT      0
+ #define _NET_WM_MOVERESIZE_SIZE_TOP          1
+@@ -462,11 +463,64 @@
+  *
+  * Check if a given window should be managed
+  */
+-static BOOL is_window_managed( HWND hwnd, UINT swp_flags, BOOL fullscreen )
++static BOOL class_is_forced_managed( HWND hwnd )
++{
++    static const char *list;
++    static BOOL initialized;
++
++    WCHAR class_name[64];
++    UNICODE_STRING str = { .Buffer = class_name, .MaximumLength = sizeof(class_name) };
++    char buffer[64];
++    const char *p;
++    unsigned int i;
++    DWORD style;
++
++    if (!initialized)
++    {
++        list = getenv( "WINE_X11_MANAGED_CLASSES" );
++        initialized = TRUE;
++    }
++    if (!list || !*list) return FALSE;
++
++    style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
++    if ((style & (WS_CHILD|WS_POPUP)) == WS_CHILD) return FALSE;
++
++    memset( class_name, 0, sizeof(class_name) );
++    if (NtUserGetClassName( hwnd, FALSE, &str ) <= 0) return FALSE;
++
++    for (i = 0; i < sizeof(buffer) - 1 && class_name[i]; i++) buffer[i] = (char)class_name[i];
++    buffer[i] = 0;
++
++    for (p = list; *p;)
++    {
++        const char *end = strchr( p, ',' );
++        size_t len = end ? (size_t)(end - p) : strlen( p );
++
++        if (len && len == strlen( buffer ) && !strncmp( p, buffer, len )) return TRUE;
++        p = end ? end + 1 : p + len;
++    }
++    return FALSE;
++}
++
++
++/* Translucent overlays must not be activation targets, the WM raises them over the dialog they dim. */
++BOOL class_is_forced_managed_overlay( HWND hwnd )
++{
++    DWORD ex_style;
++
++    if (!class_is_forced_managed( hwnd )) return FALSE;
++    /* Both flags: the dialog is layered too, but is not a tool window and must stay activatable. */
++    ex_style = NtUserGetWindowLongW( hwnd, GWL_EXSTYLE );
++    return (ex_style & (WS_EX_LAYERED|WS_EX_TOOLWINDOW)) == (WS_EX_LAYERED|WS_EX_TOOLWINDOW);
++}
++
++
++static BOOL is_window_managed_default( HWND hwnd, UINT swp_flags, BOOL fullscreen )
+ {
+     DWORD style, ex_style;
+ 
+     if (!managed_mode) return FALSE;
++    if (class_is_forced_managed( hwnd )) return TRUE;
+ 
+     /* child windows are not managed */
+     style = NtUserGetWindowLongW( hwnd, GWL_STYLE );
+@@ -494,6 +548,30 @@
+     return FALSE;
+ }
+ 
++static BOOL is_window_managed( HWND hwnd, UINT swp_flags, BOOL fullscreen )
++{
++    BOOL ret = is_window_managed_default( hwnd, swp_flags, fullscreen );
++
++    if (TRACE_ON(managed))
++    {
++        WCHAR class_name[64];
++        UNICODE_STRING str = { .Buffer = class_name, .MaximumLength = sizeof(class_name) };
++        RECT rect = {0};
++
++        memset( class_name, 0, sizeof(class_name) );
++        NtUserGetClassName( hwnd, FALSE, &str );
++        NtUserGetWindowRect( hwnd, &rect, NtUserGetDpiForWindow( hwnd ) );
++        TRACE_(managed)( "hwnd %p class %s style %#x ex_style %#x swp_flags %#x owner %p rect %dx%d+%d+%d -> %s\n",
++                         hwnd, debugstr_w(class_name),
++                         (UINT)NtUserGetWindowLongW( hwnd, GWL_STYLE ),
++                         (UINT)NtUserGetWindowLongW( hwnd, GWL_EXSTYLE ), swp_flags,
++                         NtUserGetWindowRelative( hwnd, GW_OWNER ),
++                         (int)(rect.right - rect.left), (int)(rect.bottom - rect.top),
++                         (int)rect.left, (int)rect.top, ret ? "managed" : "unmanaged" );
++    }
++    return ret;
++}
++
+ 
+ /***********************************************************************
+  *		is_window_resizable
+@@ -1201,6 +1279,7 @@
+     {
+         wm_hints->flags = InputHint | StateHint | WindowGroupHint;
+         wm_hints->input = !use_take_focus && !(style & WS_DISABLED);
++        if (class_is_forced_managed_overlay( data->hwnd )) wm_hints->input = False;
+         wm_hints->initial_state = (style & WS_MINIMIZE) ? IconicState : NormalState;
+         wm_hints->window_group = group_leader;
+         if (data->icon_pixmap)
+@@ -1213,6 +1292,20 @@
+         XFree( wm_hints );
+     }
+ 
++    /* WM_PROTOCOLS is set at window creation, before the styles are known, so refresh it here. */
++    if (data->whole_window)
++    {
++        Atom protocols[3];
++        int count = 0;
++
++        protocols[count++] = x11drv_atom(WM_DELETE_WINDOW);
++        protocols[count++] = x11drv_atom(_NET_WM_PING);
++        if (use_take_focus && !class_is_forced_managed_overlay( data->hwnd ))
++            protocols[count++] = x11drv_atom(WM_TAKE_FOCUS);
++        XChangeProperty( data->display, data->whole_window, x11drv_atom(WM_PROTOCOLS),
++                         XA_ATOM, 32, PropModeReplace, (unsigned char *)protocols, count );
++    }
++
+     window_set_net_wm_icon( data, data->icon_bits, data->icon_size );
+ 
+     if (!data->whole_window) return;
+--- a/dlls/winex11.drv/x11drv.h
++++ b/dlls/winex11.drv/x11drv.h
+@@ -479,6 +479,7 @@
+ extern BOOL usexcomposite;
+ extern BOOL use_xfixes;
+ extern BOOL managed_mode;
++extern BOOL class_is_forced_managed_overlay( HWND hwnd );
+ extern BOOL private_color_map;
+ extern int primary_monitor;
+ extern int copy_default_colors;

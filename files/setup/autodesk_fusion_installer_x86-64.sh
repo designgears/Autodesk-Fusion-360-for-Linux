@@ -1079,6 +1079,10 @@ PATCH_DAMAGE_FILE="/tmp/wine-present-wait-damage.patch"
 PATCH_DAMAGE_URL="$REPO_URL/files/setup/data/wine-present-wait-damage.patch"
 PATCH_USER32_SD_FILE="/tmp/wine-user32-ignore-desktop-sd.patch"
 PATCH_USER32_SD_URL="$REPO_URL/files/setup/data/wine-user32-ignore-desktop-sd.patch"
+PATCH_MANAGED_PROTON_FILE="/tmp/wine-managed-window-classes-proton.patch"
+PATCH_MANAGED_PROTON_URL="$REPO_URL/files/setup/data/wine-managed-window-classes-proton.patch"
+PATCH_DAMAGE_PROTON_FILE="/tmp/wine-present-wait-damage-proton.patch"
+PATCH_DAMAGE_PROTON_URL="$REPO_URL/files/setup/data/wine-present-wait-damage-proton.patch"
 
 # Applies a patch to the current source tree, tolerating an already-applied patch.
 apply_source_patch() {
@@ -1196,7 +1200,11 @@ build_patched_proton() {
         echo -e "${RED}Failed to download Proton patch. Skipping patched build.${NOCOLOR}"
         exit 1
     }
-    curl -L "$PATCH_MANAGED_URL" -o "$PATCH_MANAGED_FILE" || {
+    curl -L "$PATCH_MANAGED_PROTON_URL" -o "$PATCH_MANAGED_PROTON_FILE" || {
+        echo -e "${RED}Failed to download Proton patch. Skipping patched build.${NOCOLOR}"
+        exit 1
+    }
+    curl -L "$PATCH_DAMAGE_PROTON_URL" -o "$PATCH_DAMAGE_PROTON_FILE" || {
         echo -e "${RED}Failed to download Proton patch. Skipping patched build.${NOCOLOR}"
         exit 1
     }
@@ -1229,7 +1237,13 @@ build_patched_proton() {
         echo -e "${RED}Patch does not match this source tree!${NOCOLOR}"
         exit 1
     fi
-    apply_source_patch "$PATCH_MANAGED_FILE" "managed window classes patch"
+    # Proton's wine is based on an older release, so it gets its own versions of these patches
+    apply_source_patch "$PATCH_MANAGED_PROTON_FILE" "managed window classes patch"
+    if pkg-config --exists xdamage 2>/dev/null; then
+        apply_source_patch "$PATCH_DAMAGE_PROTON_FILE" "viewport present wait patch"
+    else
+        echo -e "${YELLOW}libXdamage development files not found, skipping the viewport present wait patch.${NOCOLOR}"
+    fi
 
     # Build and install
     echo -e "${YELLOW}Configuring Proton...${NOCOLOR}"
