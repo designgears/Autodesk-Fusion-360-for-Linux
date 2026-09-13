@@ -2,17 +2,19 @@
 
 Fork of cryinkfly's [Fusion 360 on Linux](https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux) installer.
 
-| Change | Before / After |
-|---|---|
-| Wine 11.17 | |
-| Qt dialogs, flyouts and the Advanced capabilities window are managed by the window manager | |
-| The dim overlay behind dialogs no longer takes focus, clicking it activates the dialog | |
-| Data panel fix for Wine 11.16 and newer | |
-| Fusion's bundled d3dcompiler is used to fix viewport smearing | |
-| Viewport and timeline no longer lag one frame behind | [![](files/images/fixes/viewport-one-frame-lag.gif)](https://github.com/designgears/Autodesk-Fusion-360-for-Linux/releases/download/prebuilt-wine-proton-2026.09.12/viewport-one-frame-lag-side-by-side.mp4) |
-| GE-Proton build with the same patches | |
-| Prebuilt Wine and Proton are downloaded from this repo's releases | |
-| libXdamage is a required dependency | |
+[![Viewport one frame behind, before and after](files/images/fixes/viewport-one-frame-lag.gif)](https://github.com/designgears/Autodesk-Fusion-360-for-Linux/releases/download/prebuilt-wine-proton-2026.09.12/viewport-one-frame-lag-side-by-side.mp4)
+
+Changes:
+
+- Wine 11.17
+- Qt dialogs, flyouts and the Advanced capabilities window are managed by the window manager
+- The dim overlay behind dialogs no longer takes focus, clicking it activates the dialog
+- Data panel fix for Wine 11.16 and newer
+- Fusion's bundled d3dcompiler is used to fix viewport smearing
+- Viewport and timeline no longer lag one frame behind
+- GE-Proton build with the same patches
+- Prebuilt Wine and Proton are downloaded from this repo's releases
+- libXdamage is a required dependency
 
 Install with the patched Wine:
 
