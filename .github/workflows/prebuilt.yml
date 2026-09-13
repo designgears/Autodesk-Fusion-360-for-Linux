@@ -56,6 +56,8 @@ jobs:
           printf 'deb-src http://archive.ubuntu.com/ubuntu jammy main universe\ndeb-src http://archive.ubuntu.com/ubuntu jammy-updates main universe\n' |
             sudo tee /etc/apt/sources.list.d/deb-src.list
           sudo apt-get update
+          # The runner's preinstalled libunwind-14-dev conflicts with libunwind-dev, which wine and gstreamer need
+          sudo apt-get remove -y libunwind-14-dev
           sudo apt-get build-dep -y wine
           sudo apt-get install -y gcc-mingw-w64 flex bison
 
