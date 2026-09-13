@@ -1,38 +1,22 @@
 # Autodesk Fusion on Linux
 
-This is a fork of [cryinkfly's Autodesk Fusion 360 on Linux](https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux) with a patched Wine and Proton that fix the problems I kept running into. The original README is below. Its install commands still point at the original repo, use the ones here to get the fixes.
+This is my fork of cryinkfly's [Fusion 360 on Linux](https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux) installer. Fusion only half worked for me under Wine, so I patched Wine and Proton until it stopped fighting me. Dialogs stay where they should, the data panel works on newer Wine, the viewport doesn't smear, and it updates right away instead of a frame late.
 
-### What's fixed
-
-- Dialogs, flyouts and the Advanced capabilities window get managed by the window manager properly
-- The dim overlay behind dialogs no longer steals focus, clicking it brings the dialog back
-- The data panel on the left works again on Wine 11.16 and newer
-- The 3D viewport no longer smears (Fusion's own shader compiler is used)
-- The viewport and timeline no longer lag a frame behind until you move the mouse
-
-The patches live in `files/setup/data/`. Prebuilt Wine 11.17 and GE-Proton builds with them applied are on the [releases page](https://github.com/designgears/Autodesk-Fusion-360-for-Linux/releases), and the installer downloads them for you.
-
-### Install
-
-Patched Wine (recommended):
+Install with the patched Wine:
 
 ```
 curl -L https://raw.githubusercontent.com/designgears/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --install-fix --default
 ```
 
-Patched Proton:
+Or with the patched Proton:
 
 ```
 curl -L https://raw.githubusercontent.com/designgears/Autodesk-Fusion-360-for-Linux/main/files/setup/autodesk_fusion_installer_x86-64.sh -o "autodesk_fusion_installer_x86-64.sh" && chmod +x autodesk_fusion_installer_x86-64.sh && ./autodesk_fusion_installer_x86-64.sh --proton=GE-Proton11-Fusion --default
 ```
 
-Build them yourself instead of downloading, use `--build wine-fix` or `--build proton-fix`.
+The installer downloads the prebuilt Wine or Proton from the releases here. If you'd rather build them yourself, use `--build wine-fix` or `--build proton-fix`. You'll need libXdamage, and the installer will install it if it's missing.
 
-libXdamage is required for the viewport fix. The installer checks for it and installs it if it's missing.
-
-### Prebuilt releases
-
-The builds on the releases page come from the `Prebuilt Wine and Proton` GitHub Actions workflow. Push a tag starting with `prebuilt-` (or run the workflow from the Actions tab) and it builds both, then uploads them to a release with that tag. If you make a new release, point `PREBUILT_URL` in the installer at the new tag.
+Everything below is cryinkfly's original README. Its install commands point at the original repo and won't get you these fixes.
 
 ---
 
