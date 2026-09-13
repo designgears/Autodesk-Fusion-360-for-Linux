@@ -1077,6 +1077,8 @@ PATCH_MANAGED_FILE="/tmp/wine-managed-window-classes.patch"
 PATCH_MANAGED_URL="$REPO_URL/files/setup/data/wine-managed-window-classes.patch"
 PATCH_DAMAGE_FILE="/tmp/wine-present-wait-damage.patch"
 PATCH_DAMAGE_URL="$REPO_URL/files/setup/data/wine-present-wait-damage.patch"
+PATCH_USER32_SD_FILE="/tmp/wine-user32-ignore-desktop-sd.patch"
+PATCH_USER32_SD_URL="$REPO_URL/files/setup/data/wine-user32-ignore-desktop-sd.patch"
 
 # Applies a patch to the current source tree, tolerating an already-applied patch.
 apply_source_patch() {
@@ -1100,7 +1102,7 @@ build_patched_wine() {
     WINE_SOURCE_DIR="$HOME/fusion-wine-source"
 
     rm -rf "$WINE_BUILD_DIR"
-    rm -f "$PATCH_POPUPS_FILE" "$PATCH_MANAGED_FILE" "$PATCH_PIPE_FILE" "$PATCH_DAMAGE_FILE"
+    rm -f "$PATCH_POPUPS_FILE" "$PATCH_MANAGED_FILE" "$PATCH_PIPE_FILE" "$PATCH_DAMAGE_FILE" "$PATCH_USER32_SD_FILE"
     echo -e "${YELLOW}Building patched Wine for Fusion 360 window fix (this will take 15-30 minutes)...${NOCOLOR}"
 
     # Download patches
@@ -1114,6 +1116,10 @@ build_patched_wine() {
         exit 1
     }
     curl -L "$PATCH_DAMAGE_URL" -o "$PATCH_DAMAGE_FILE" || {
+        echo -e "${RED}Failed to download Wine patch. Skipping patched build.${NOCOLOR}"
+        exit 1
+    }
+    curl -L "$PATCH_USER32_SD_URL" -o "$PATCH_USER32_SD_FILE" || {
         echo -e "${RED}Failed to download Wine patch. Skipping patched build.${NOCOLOR}"
         exit 1
     }
@@ -1145,6 +1151,7 @@ build_patched_wine() {
         exit 1
     fi
     apply_source_patch "$PATCH_MANAGED_FILE" "managed window classes patch"
+    apply_source_patch "$PATCH_USER32_SD_FILE" "user32 desktop security patch"
     # Fixes the viewport showing the previous frame, needs the libXdamage headers
     if pkg-config --exists xdamage 2>/dev/null; then
         apply_source_patch "$PATCH_DAMAGE_FILE" "viewport present wait patch"
