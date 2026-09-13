@@ -1,6 +1,18 @@
 # Autodesk Fusion on Linux
 
-This is my fork of cryinkfly's [Fusion 360 on Linux](https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux) installer. Fusion only half worked for me under Wine, so I patched Wine and Proton until it stopped fighting me. Dialogs stay where they should, the data panel works on newer Wine, the viewport doesn't smear, and it updates right away instead of a frame late.
+Fork of cryinkfly's [Fusion 360 on Linux](https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux) installer.
+
+Changes:
+
+- Wine 11.17
+- Qt dialogs, flyouts and the Advanced capabilities window are managed by the window manager
+- The dim overlay behind dialogs no longer takes focus, clicking it activates the dialog
+- Data panel fix for Wine 11.16 and newer
+- Fusion's bundled d3dcompiler is used to fix viewport smearing
+- Viewport and timeline no longer lag one frame behind
+- GE-Proton build with the same patches
+- Prebuilt Wine and Proton are downloaded from this repo's releases
+- libXdamage is a required dependency
 
 Install with the patched Wine:
 
