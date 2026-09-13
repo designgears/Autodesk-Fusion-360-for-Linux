@@ -1,4 +1,4 @@
-# Autodesk Fusion on Linux (designgears fork)
+# Autodesk Fusion on Linux
 
 This is a fork of [cryinkfly's Autodesk Fusion 360 on Linux](https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux) with a patched Wine and Proton that fix the problems I kept running into. The original README is below. Its install commands still point at the original repo, use the ones here to get the fixes.
 
