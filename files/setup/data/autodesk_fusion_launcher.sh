@@ -100,6 +100,11 @@ function update() {
 WINE_X11_MANAGED_CLASSES="${WINE_X11_MANAGED_CLASSES-Qt683QWindowToolSaveBits,Qt683QWindowToolSaveBitsOwnDC,Qt683QWindow,Qt683QWindowOwnDCIcon}"
 export WINE_X11_MANAGED_CLASSES
 
+# Use the Microsoft shader compiler bundled with Fusion. Wine's builtin one (vkd3d 2.1)
+# lays out effect constant buffers wrongly and the 3D viewport stops clearing.
+WINEDLLOVERRIDES="d3dcompiler_47,d3dcompiler_43=n,b${WINEDLLOVERRIDES:+;$WINEDLLOVERRIDES}"
+export WINEDLLOVERRIDES
+
 function run_autodesk_fusion() {
     if [ "$PROTON_VERSION" == "Wine" ]; then
         run_autodesk_fusion_wine
