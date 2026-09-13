@@ -38,7 +38,7 @@ fi
 WINE_PFX=$(awk 'NR == 3' "$WINEPREFIX_LOG_FILE")
 PROTON_VERSION=$(awk 'NR == 4' "$WINEPREFIX_LOG_FILE")
 
-REPO_URL="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main"
+REPO_URL="https://raw.githubusercontent.com/designgears/Autodesk-Fusion-360-for-Linux/main"
 
 # This feature will check if there is a new version of Autodesk Fusion 360.
 function check_autodesk_fusion_online_versions() {

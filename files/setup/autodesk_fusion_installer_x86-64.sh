@@ -63,7 +63,7 @@ if [ "$SELECTED_EXTENSIONS" == "--full" ]; then
     DOWNLOAD_EXTENSIONS=1
 fi
 
-REPO_URL="https://codeberg.org/cryinkfly/Autodesk-Fusion-360-on-Linux/raw/branch/main"
+REPO_URL="https://raw.githubusercontent.com/designgears/Autodesk-Fusion-360-for-Linux/main"
 
 # URL to download translations po. files <-- Still in progress!!!
 UPDATER_TRANSLATIONS_URL="$REPO_URL/files/setup/locale/update-locale.sh"
@@ -86,6 +86,9 @@ declare -A TRANSLATION_URLS=(
 # URL to download winetricks
 WINETRICKS_URL="https://raw.githubusercontent.com/Winetricks/winetricks/master/src/winetricks"
 
+# Prebuilt patched wine and proton
+PREBUILT_URL="https://github.com/designgears/Autodesk-Fusion-360-for-Linux/releases/download/prebuilt-wine-proton-2026.09.12"
+
 # URL to download Fusion360Installer.exe files
 AUTODESK_FUSION_INSTALLER_URL="https://dl.appstreaming.autodesk.com/production/installers/Fusion%20Admin%20Install.exe"
 #AUTODESK_FUSION_INSTALLER_URL="https://github.com/Lolig4/Autodesk-Fusion-360-for-Linux/releases/download/Fusion_24.03.2026/Fusion_24.03.2026.tar.gz"
@@ -101,6 +104,12 @@ SIAPPDLL_URL="$REPO_URL/files/extras/patched-dlls/siappdll.dll"
 # CHECK THE REQUIRED PACKAGES FOR THE INSTALLER:                                                                                                                             #
 ##############################################################################################################################################################################
 
+# libXdamage is a library, not a command, so look for it in the linker cache and the usual lib dirs
+has_libxdamage() {
+    { ldconfig -p 2>/dev/null || /sbin/ldconfig -p 2>/dev/null; } | grep -q 'libXdamage\.so\.1 ' && return 0
+    ls /usr/lib/libXdamage.so.1 /usr/lib64/libXdamage.so.1 /usr/lib/x86_64-linux-gnu/libXdamage.so.1 &>/dev/null
+}
+
 check_required_packages() {
     # Extracting the Linux distribution ID and version
     DISTRO=$(grep -d skip "^ID=" /etc/*-release | cut -d'=' -f2 | tr -d '"')
@@ -111,9 +120,9 @@ check_required_packages() {
 
     # Example required commands, now including "xrandr" and "bc"
     if [[ $DISTRO_VERSION == *"arch"* ]] || [[ $DISTRO_VERSION == *"manjaro"* ]] || [[ $DISTRO_VERSION == *"endeavouros"* ]] || [[ $DISTRO_VERSION == *"cachyos"* ]]; then
-        REQUIRED_COMMANDS=("curl" "lsb_release" "glxinfo" "pkexec" "wget" "awk" "7z" "cabextract" "wbinfo" "systemctl" "bc" "xrandr" "mokutil" "xdg-open" "xdg-mime" "update-desktop-database" "qtpaths")
+        REQUIRED_COMMANDS=("curl" "lsb_release" "glxinfo" "pkexec" "wget" "awk" "7z" "cabextract" "wbinfo" "systemctl" "bc" "xrandr" "mokutil" "xdg-open" "xdg-mime" "update-desktop-database" "qtpaths" "libxdamage")
     else
-        REQUIRED_COMMANDS=("curl" "lsb_release" "glxinfo" "pkexec" "wget" "awk" "7z" "cabextract" "wbinfo" "systemctl" "bc" "xrandr" "mokutil" "xdg-open" "xdg-mime" "update-desktop-database")
+        REQUIRED_COMMANDS=("curl" "lsb_release" "glxinfo" "pkexec" "wget" "awk" "7z" "cabextract" "wbinfo" "systemctl" "bc" "xrandr" "mokutil" "xdg-open" "xdg-mime" "update-desktop-database" "libxdamage")
     fi
 
     # Additional requirements for building patched Wine/Proton.
@@ -127,7 +136,7 @@ check_required_packages() {
     # Check for required commands
     for cmd in "${REQUIRED_COMMANDS[@]}"; do
         echo -e "${YELLOW}Checking for required command: ${cmd} ...${NOCOLOR}"
-        if [[ "$cmd" == "wine-build-dependency" ]] || command -v "$cmd" &>/dev/null; then
+        if [[ "$cmd" == "wine-build-dependency" ]] || [[ "$cmd" == "libxdamage" ]] || command -v "$cmd" &>/dev/null; then
             case "$cmd" in
                 7z)
                     if ! 7z &>/dev/null; then
@@ -245,6 +254,14 @@ check_required_packages() {
                         fi
                     fi
                     ;;
+                libxdamage)
+                    if ! has_libxdamage; then
+                        echo -e "${RED}The required library (libXdamage) is not available!${NOCOLOR}"
+                        MISSING_COMMANDS+=("$cmd")
+                    else
+                        echo -e "${GREEN}The required library (libXdamage) is available!${NOCOLOR}"
+                    fi
+                    ;;
                 ccache)
                     if ! ccache --version &>/dev/null; then
                         echo -e "${RED}The required command (${cmd}) is not available!${NOCOLOR}"
@@ -274,6 +291,11 @@ check_required_packages() {
     # If there are missing commands, install them
     if [ ${#MISSING_COMMANDS[@]} -gt 0 ]; then
         install_required_packages
+        # The viewport patch needs libXdamage at runtime, don't continue without it
+        if ! has_libxdamage; then
+            echo -e "${RED}libXdamage is still missing. Please install it with your package manager and run the installer again.${NOCOLOR}"
+            exit 1
+        fi
     else
         echo -e "${GREEN}All required commands are available!${NOCOLOR}"
     fi
@@ -296,7 +318,7 @@ install_required_packages() {
     if [[ $DISTRO_VERSION == *"arch"* ]] || [[ $DISTRO_VERSION == *"manjaro"* ]] || [[ $DISTRO_VERSION == *"endeavouros"* ]] || [[ $DISTRO_VERSION == *"cachyos"* ]]; then
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
-        sudo pacman -S gawk cabextract coreutils curl lsb-release mesa-demos mesa-utils p7zip polkit samba wget libspnav xdg-utils bc xorg-xrandr mokutil desktop-file-utils qt5-tools --noconfirm
+        sudo pacman -S gawk cabextract coreutils curl lsb-release mesa-demos mesa-utils p7zip polkit samba wget libspnav xdg-utils bc xorg-xrandr mokutil desktop-file-utils qt5-tools libxdamage --noconfirm
         sudo systemctl enable --now spacenavd
         echo -e "$(gettext "${GREEN}All required packages for the installer are installed!")${NOCOLOR}"
         sleep 2
@@ -305,9 +327,9 @@ install_required_packages() {
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
         if [[ $DISTRO == "ubuntu" ]] && { [[ $MAJOR -gt 25 ]] || { [[ $MAJOR -eq 25 ]] && [[ $MINOR -ge 04 ]]; }; }; then
-            sudo apt install -y polkitd pkexec gawk cabextract coreutils curl lsb-release mesa-utils p7zip p7zip-full p7zip-rar samba-ad-dc spacenavd winbind wget xdg-utils bc x11-xserver-utils desktop-file-utils
+            sudo apt install -y polkitd pkexec gawk cabextract coreutils curl lsb-release mesa-utils p7zip p7zip-full p7zip-rar samba-ad-dc spacenavd winbind wget xdg-utils bc x11-xserver-utils desktop-file-utils libxdamage1
         else
-            sudo apt install -y gawk cabextract coreutils curl lsb-release mesa-utils p7zip p7zip-full p7zip-rar policykit-1 samba spacenavd winbind wget xdg-utils bc x11-xserver-utils desktop-file-utils
+            sudo apt install -y gawk cabextract coreutils curl lsb-release mesa-utils p7zip p7zip-full p7zip-rar policykit-1 samba spacenavd winbind wget xdg-utils bc x11-xserver-utils desktop-file-utils libxdamage1
         fi
         if [[ $SELECTED_OPTION == "--build" ]]; then
             if grep -q "ubuntu.sources" /etc/apt/sources.list.d/ubuntu.sources 2>/dev/null; then
@@ -325,7 +347,7 @@ install_required_packages() {
     elif [[ $DISTRO_VERSION == *"fedora"* ]] || [[ $DISTRO_VERSION == *"nobara"* ]]; then
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
-        sudo dnf install -y cabextract coreutils curl gawk lsb_release mesa-demos p7zip p7zip-plugins polkit samba-dc samba-winbind samba-winbind-clients spacenavd wget xdg-utils bc xorg-x11-server-utils desktop-file-utils
+        sudo dnf install -y cabextract coreutils curl gawk lsb_release mesa-demos p7zip p7zip-plugins polkit samba-dc samba-winbind samba-winbind-clients spacenavd wget xdg-utils bc xorg-x11-server-utils desktop-file-utils libXdamage
         if [[ $SELECTED_OPTION == "--build" ]]; then
             sudo dnf install -y ccache dnf-plugins-core
             sudo dnf builddep -y wine --allowerasing
@@ -336,7 +358,7 @@ install_required_packages() {
     elif [[ $DISTRO_VERSION == *"gentoo"* ]]; then
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
-        sudo emerge -q net-fs/samba app-misc/spacenavd app-arch/cabextract app-arch/p7zip net-misc/curl net-misc/wget sys-apps/coreutils sys-apps/gawk sys-apps/lsb-release sys-auth/polkit x11-apps/mesa-progs x11-misc/xdg-utils sys-apps/bc x11-apps/xrandr dev-util/desktop-file-utils
+        sudo emerge -q net-fs/samba app-misc/spacenavd app-arch/cabextract app-arch/p7zip net-misc/curl net-misc/wget sys-apps/coreutils sys-apps/gawk sys-apps/lsb-release sys-auth/polkit x11-apps/mesa-progs x11-misc/xdg-utils sys-apps/bc x11-apps/xrandr x11-libs/libXdamage dev-util/desktop-file-utils
         # Enable the optional spacenavd service depending on the init system (Gentoo supports both systemd and OpenRC)
         if command -v systemctl &> /dev/null; then
             sudo systemctl enable --now spacenavd
@@ -349,14 +371,14 @@ install_required_packages() {
     elif [[ $DISTRO_VERSION == *"nixos"* ]]; then
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
-        sudo nix-env -iA gawk nixos.cabextract nixos.coreutils nixos.curl nixos.lsb_release nixos.mesa-utils nixos.p7zip nixos.polkit nixos.samba nixos.spacenavd nixos.wget nixos.winbind nixos.xdg_utils nixos.bc nixos.xrandr nixos.desktop-file-utils
+        sudo nix-env -iA gawk nixos.cabextract nixos.coreutils nixos.curl nixos.lsb_release nixos.mesa-utils nixos.p7zip nixos.polkit nixos.samba nixos.spacenavd nixos.wget nixos.winbind nixos.xdg_utils nixos.bc nixos.xrandr nixos.desktop-file-utils nixos.xorg.libXdamage
         sudo systemctl enable --now spacenavd
         echo -e "$(gettext "${GREEN}All required packages for the installer are installed!")${NOCOLOR}"
         sleep 2
     elif [[ $DISTRO_VERSION == *"opensuse"* ]]; then
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
-        sudo zypper install -y cabextract coreutils curl gawk lsb-release Mesa-demo-x p7zip-full polkit samba samba-client samba-winbind spacenavd wget wine xdg-utils bc xorg-x11-server-utils desktop-file-utils
+        sudo zypper install -y cabextract coreutils curl gawk lsb-release Mesa-demo-x p7zip-full polkit samba samba-client samba-winbind spacenavd wget wine xdg-utils bc xorg-x11-server-utils desktop-file-utils libXdamage1
         sudo systemctl enable --now spacenavd
         echo -e "$(gettext "${GREEN}All required packages for the installer are installed!")${NOCOLOR}"
         sleep 2
@@ -365,14 +387,14 @@ install_required_packages() {
         sleep 2
         if command -v dnf &> /dev/null; then # Use dnf for newer distributions
             sudo dnf install -y epel-release
-            sudo dnf install -y cabextract coreutils curl gawk lsb_release mesa-demos p7zip p7zip-plugins polkit samba-dc samba-winbind samba-winbind-clients spacenavd wget xdg-utils bc xorg-x11-server-utils desktop-file-utils
+            sudo dnf install -y cabextract coreutils curl gawk lsb_release mesa-demos p7zip p7zip-plugins polkit samba-dc samba-winbind samba-winbind-clients spacenavd wget xdg-utils bc xorg-x11-server-utils desktop-file-utils libXdamage
             if [[ $SELECTED_OPTION == "--build" ]]; then
                 sudo dnf install -y ccache dnf-plugins-core
                 sudo dnf builddep -y wine --allowerasing
             fi
         else  # Use yum for older distributions
             sudo yum install -y epel-release 
-            sudo yum install -y cabextract coreutils curl gawk lsb_release mesa-demos p7zip p7zip-plugins polkit samba-dc samba-winbind samba-winbind-clients spacenavd wget xdg-utils bc xorg-x11-server-utils desktop-file-utils
+            sudo yum install -y cabextract coreutils curl gawk lsb_release mesa-demos p7zip p7zip-plugins polkit samba-dc samba-winbind samba-winbind-clients spacenavd wget xdg-utils bc xorg-x11-server-utils desktop-file-utils libXdamage
             if [[ $SELECTED_OPTION == "--build" ]]; then
                 sudo yum install -y ccache yum-utils
                 sudo yum-builddep -y wine --allowerasing
@@ -384,14 +406,14 @@ install_required_packages() {
     elif [[ $DISTRO_VERSION == *"solus"* ]]; then
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
-        sudo eopkg -y install gawk cabextract coreutils curl lsb-release mesa-utils p7zip p7zip-plugins spacenavd polkit wget winbind xdg-utils bc xrandr desktop-file-utils
+        sudo eopkg -y install gawk cabextract coreutils curl lsb-release mesa-utils p7zip p7zip-plugins spacenavd polkit wget winbind xdg-utils bc xrandr desktop-file-utils libxdamage
         sudo systemctl enable --now spacenavd
         echo -e "$(gettext "${GREEN}All required packages for the installer are installed!")${NOCOLOR}"
         sleep 2
     elif [[ $DISTRO_VERSION == *"void"* ]]; then
         echo -e "$(gettext "${YELLOW}All required packages for the installer will be installed!")${NOCOLOR}"
         sleep 2
-        sudo xbps-install -Sy gawk cabextract coreutils curl lsb-release mesa-demos p7zip-full polkit samba-winbind spacenavd wget xdg-utils bc xrandr desktop-file-utils
+        sudo xbps-install -Sy gawk cabextract coreutils curl lsb-release mesa-demos p7zip-full polkit samba-winbind spacenavd wget xdg-utils bc xrandr desktop-file-utils libXdamage
         sudo ln -s /usr/sbin/spacenavd /etc/sv/spacenavd
         sudo sv enable spacenavd
         sudo sv start spacenavd
@@ -1156,12 +1178,8 @@ build_patched_wine() {
     fi
     apply_source_patch "$PATCH_MANAGED_FILE" "managed window classes patch"
     apply_source_patch "$PATCH_USER32_SD_FILE" "user32 desktop security patch"
-    # Fixes the viewport showing the previous frame, needs the libXdamage headers
-    if pkg-config --exists xdamage 2>/dev/null; then
-        apply_source_patch "$PATCH_DAMAGE_FILE" "viewport present wait patch"
-    else
-        echo -e "${YELLOW}libXdamage development files not found, skipping the viewport present wait patch.${NOCOLOR}"
-    fi
+    # Fixes the viewport showing the previous frame
+    apply_source_patch "$PATCH_DAMAGE_FILE" "viewport present wait patch"
 
     # Build and install
     echo -e "${YELLOW}Configuring Wine...${NOCOLOR}"
@@ -1239,11 +1257,7 @@ build_patched_proton() {
     fi
     # Proton's wine is based on an older release, so it gets its own versions of these patches
     apply_source_patch "$PATCH_MANAGED_PROTON_FILE" "managed window classes patch"
-    if pkg-config --exists xdamage 2>/dev/null; then
-        apply_source_patch "$PATCH_DAMAGE_PROTON_FILE" "viewport present wait patch"
-    else
-        echo -e "${YELLOW}libXdamage development files not found, skipping the viewport present wait patch.${NOCOLOR}"
-    fi
+    apply_source_patch "$PATCH_DAMAGE_PROTON_FILE" "viewport present wait patch"
 
     # Build and install
     echo -e "${YELLOW}Configuring Proton...${NOCOLOR}"
@@ -1302,13 +1316,13 @@ download_files() {
     sleep 2
 
     if [[ ! -x "$WINE_BUILD_DIR/bin/wine" && "$SELECTED_OPTION" == "--install-fix" ]]; then
-        download_file "fusion-wine-build.tar.gz" "https://github.com/Lolig4/Autodesk-Fusion-360-for-Linux/releases/download/Pre_Build_Wine%2FProton_01.06.26/fusion-wine-build.tar.gz"
+        download_file "fusion-wine-build.tar.gz" "$PREBUILT_URL/fusion-wine-build.tar.gz"
         rm -rf "$WINE_BUILD_DIR"
         echo -e "$(gettext "${YELLOW}Extracting Custom Fusion Wine Build...${NOCOLOR}")"
         tar -xf "$SELECTED_DIRECTORY/downloads/fusion-wine-build.tar.gz" -C "$HOME"
     fi
     if [[ ! -x "$PROTON_DIRECTORY/proton" &&"$SELECTED_OPTION" == "--proton" && "$PROTON_VERSION" == "$PROTON_BUILD_NAME" ]]; then
-        download_file "$PROTON_BUILD_NAME.tar.gz" "https://github.com/Lolig4/Autodesk-Fusion-360-for-Linux/releases/download/Pre_Build_Wine%2FProton_01.06.26/$PROTON_BUILD_NAME.tar.gz"
+        download_file "$PROTON_BUILD_NAME.tar.gz" "$PREBUILT_URL/$PROTON_BUILD_NAME.tar.gz"
         rm -rf "$PROTON_DIRECTORY"
         echo -e "$(gettext "${YELLOW}Extracting Custom Proton Build...${NOCOLOR}")"
         tar -xf "$SELECTED_DIRECTORY/downloads/$PROTON_BUILD_NAME.tar.gz" -C "$STEAM_COMPAT_DIR"
